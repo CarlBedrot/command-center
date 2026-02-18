@@ -1,0 +1,2146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beddan Command Center</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f0f1a 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 5px;
+    }
+
+    .header .subtitle {
+      color: #666;
+      font-size: 0.85rem;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 24px;
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.05);
+      flex-wrap: wrap;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-dot.green { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
+    .status-dot.yellow { background: #ffcc00; box-shadow: 0 0 10px #ffcc0055; }
+    .status-dot.blue { background: #00d4ff; box-shadow: 0 0 10px #00d4ff55; }
+    .status-dot.red { background: #ff4757; box-shadow: 0 0 10px #ff475755; }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px 10px 0 0;
+      color: #888;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .tab:hover { color: #ccc; background: rgba(255,255,255,0.06); }
+    .tab.active {
+      color: #00d4ff;
+      background: rgba(0,212,255,0.08);
+      border-color: rgba(0,212,255,0.3);
+      border-bottom-color: transparent;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (min-width: 601px) and (max-width: 900px) {
+      .chat-overlay { width: 380px !important; }
+      .sidebar { display: grid; grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 600px) {
+      .tabs { gap: 2px; }
+      .tab { padding: 8px 14px; font-size: 0.8rem; }
+      body { padding: 10px; }
+      .chat-overlay { width: 100% !important; }
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(0, 212, 255, 0.3);
+      transform: translateY(-2px);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      background: linear-gradient(135deg, #7b2cbf, #00d4ff);
+      flex-shrink: 0;
+    }
+
+    .card-icon.cron { background: linear-gradient(135deg, #e17055, #fdcb6e); }
+    .card-icon.channel { background: linear-gradient(135deg, #00b894, #00cec9); }
+    .card-icon.session { background: linear-gradient(135deg, #6c5ce7, #a29bfe); }
+    .card-icon.agent { background: linear-gradient(135deg, #0984e3, #74b9ff); }
+    .card-icon.skill { background: linear-gradient(135deg, #00b894, #55efc4); }
+    .card-icon.log-error { background: linear-gradient(135deg, #d63031, #ff7675); }
+    .card-icon.log-warn { background: linear-gradient(135deg, #fdcb6e, #e17055); }
+    .card-icon.log-info { background: linear-gradient(135deg, #636e72, #b2bec3); }
+
+    .card-info h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .card-sub {
+      font-size: 0.75rem;
+      color: #888;
+    }
+
+    .card-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+    }
+
+    .card-detail {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+
+    .token-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .token-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    .token-bar-fill.low { background: #00ff88; }
+    .token-bar-fill.medium { background: #ffcc00; }
+    .token-bar-fill.high { background: #ff4757; }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .quick-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .action-btn {
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      color: #00d4ff;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .action-btn:hover {
+      background: rgba(0, 212, 255, 0.2);
+      border-color: #00d4ff;
+    }
+
+    .action-btn.secondary {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.1);
+      color: #aaa;
+    }
+
+    .action-btn.secondary:hover {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+
+    .action-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .channel-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.85rem;
+    }
+
+    .channel-row:last-child { border-bottom: none; }
+
+    .cron-mini {
+      list-style: none;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .cron-mini li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.8rem;
+    }
+
+    .cron-mini li:last-child { border-bottom: none; }
+
+    .cron-name { color: #e0e0e0; }
+    .cron-next { color: #666; font-size: 0.75rem; }
+
+    .filter-pill {
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.03);
+      color: #888;
+      transition: all 0.2s;
+    }
+
+    .filter-pill:hover { color: #ccc; border-color: rgba(255,255,255,0.2); }
+    .filter-pill.active { color: #00d4ff; border-color: rgba(0,212,255,0.4); background: rgba(0,212,255,0.1); }
+
+    .session-group-title {
+      font-size: 0.8rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 20px 0 10px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .session-group-title:first-child { margin-top: 0; }
+
+    .cron-run-btn {
+      background: rgba(0,212,255,0.15);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #00d4ff;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .cron-run-btn:hover { background: rgba(0,212,255,0.3); }
+    .cron-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Chat Panel */
+    .chat-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 480px;
+      height: 100vh;
+      background: #12121f;
+      border-left: 1px solid rgba(255,255,255,0.1);
+      z-index: 1000;
+      flex-direction: column;
+    }
+
+    .chat-overlay.active { display: flex; }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.3);
+    }
+
+    .chat-header h3 { font-size: 1rem; }
+
+    .chat-close {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .chat-close:hover { color: #fff; }
+
+    .chat-session-info {
+      padding: 12px 20px;
+      background: rgba(0,0,0,0.2);
+      font-size: 0.75rem;
+      color: #666;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chat-msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .chat-msg.user {
+      align-self: flex-end;
+      background: rgba(0,212,255,0.15);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #e0e0e0;
+    }
+
+    .chat-msg.agent {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #ccc;
+    }
+
+    .chat-msg.system {
+      align-self: center;
+      background: rgba(255,204,0,0.1);
+      border: 1px solid rgba(255,204,0,0.2);
+      color: #ffcc00;
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    .chat-msg.error {
+      align-self: center;
+      background: rgba(255,71,87,0.1);
+      border: 1px solid rgba(255,71,87,0.2);
+      color: #ff4757;
+      font-size: 0.8rem;
+    }
+
+    .chat-msg pre {
+      background: rgba(0,0,0,0.4);
+      padding: 8px 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 6px 0;
+      font-size: 0.8rem;
+    }
+
+    .chat-input-area {
+      padding: 16px 20px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .thinking-pills {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .thinking-pill {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.03);
+      color: #888;
+      transition: all 0.2s;
+    }
+
+    .thinking-pill:hover { color: #ccc; border-color: rgba(255,255,255,0.2); }
+    .thinking-pill.active { color: #7b2cbf; border-color: rgba(123,44,191,0.4); background: rgba(123,44,191,0.1); }
+
+    .chat-input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .chat-input {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #e0e0e0;
+      font-size: 0.85rem;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+    }
+
+    .chat-input:focus { border-color: rgba(0,212,255,0.5); }
+
+    .chat-send {
+      background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+      border: none;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+
+    .chat-send:hover { opacity: 0.8; }
+    .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .typing-indicator {
+      display: none;
+      padding: 8px 20px;
+      gap: 4px;
+    }
+
+    .typing-indicator.active { display: flex; }
+
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      background: #888;
+      border-radius: 50%;
+      animation: typingBounce 1.4s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingBounce {
+      0%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-6px); }
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active { display: flex; }
+
+    .modal-content {
+      background: #1a1a2e;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-header h2 {
+      font-size: 1.2rem;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .modal-close:hover { color: #fff; }
+
+    .spawn-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .spawn-form label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .spawn-form input,
+    .spawn-form textarea {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #e0e0e0;
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .spawn-form input:focus,
+    .spawn-form textarea:focus {
+      border-color: rgba(0,212,255,0.5);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .pulse { animation: pulse 2s infinite; }
+
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .hidden { display: none !important; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1a1a2e;
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #e0e0e0;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      z-index: 2000;
+      transition: transform 0.3s ease;
+    }
+
+    .toast.visible { transform: translateX(-50%) translateY(0); }
+    .toast.error { border-color: rgba(255,71,87,0.5); color: #ff4757; }
+
+    /* Health Banner */
+    .health-banner {
+      display: none;
+      max-width: 1400px;
+      margin: 0 auto 16px auto;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      border: 1px solid rgba(255,71,87,0.3);
+      background: rgba(255,71,87,0.08);
+      color: #ff8a8a;
+    }
+
+    .health-banner.warn {
+      display: block;
+      border-color: rgba(255,204,0,0.3);
+      background: rgba(255,204,0,0.08);
+      color: #ffdd57;
+    }
+
+    .health-banner.critical {
+      display: block;
+      border-color: rgba(255,71,87,0.4);
+      background: rgba(255,71,87,0.1);
+      color: #ff6b6b;
+    }
+
+    .health-banner-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+
+    .health-banner-item + .health-banner-item {
+      border-top: 1px solid rgba(255,255,255,0.05);
+      margin-top: 4px;
+      padding-top: 8px;
+    }
+
+    /* Cron toggle */
+    .cron-toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.15);
+      cursor: pointer;
+      border: none;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .cron-toggle.on { background: rgba(0,255,136,0.4); }
+
+    .cron-toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+    }
+
+    .cron-toggle.on .cron-toggle-knob { transform: translateX(16px); }
+
+    /* Payload preview */
+    .payload-preview {
+      background: rgba(0,0,0,0.25);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 8px;
+      max-height: 60px;
+      overflow: hidden;
+      line-height: 1.4;
+      position: relative;
+      cursor: pointer;
+      transition: max-height 0.3s;
+    }
+
+    .payload-preview.expanded {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .payload-preview::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 20px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.4));
+      pointer-events: none;
+    }
+
+    .payload-preview.expanded::after { display: none; }
+
+    /* Refresh indicator */
+    .refresh-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      color: #555;
+      justify-content: center;
+      margin-top: 12px;
+      transition: color 0.3s;
+    }
+
+    .refresh-bar.stale { color: #ff4757; }
+    .refresh-bar.fetching { color: #00d4ff; }
+
+    .refresh-spinner {
+      width: 10px;
+      height: 10px;
+      border: 2px solid rgba(0,212,255,0.3);
+      border-top-color: #00d4ff;
+      border-radius: 50%;
+      display: none;
+    }
+
+    .refresh-bar.fetching .refresh-spinner {
+      display: inline-block;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Error state */
+    .error-state {
+      text-align: center;
+      padding: 30px 20px;
+      color: #888;
+    }
+
+    .error-state p { margin-bottom: 12px; }
+
+    .retry-btn {
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #00d4ff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+
+    .retry-btn:hover { background: rgba(0,212,255,0.2); }
+
+    /* Cron run history */
+    .cron-history {
+      margin-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      padding-top: 10px;
+    }
+
+    .cron-history-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 0.75rem;
+      color: #888;
+    }
+
+    .cron-history-row + .cron-history-row {
+      border-top: 1px solid rgba(255,255,255,0.03);
+    }
+
+    /* Log entries */
+    .log-entry {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      line-height: 1.4;
+    }
+
+    .log-entry.log-error { color: #ff6b6b; }
+    .log-entry.log-warn { color: #ffdd57; }
+    .log-entry.log-info { color: #aaa; }
+    .log-entry .log-ts { color: #555; margin-right: 8px; }
+    .log-entry .log-level { font-weight: 600; margin-right: 8px; min-width: 50px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>BEDDAN COMMAND CENTER</h1>
+    <div class="subtitle">OpenClaw Gateway Control <span id="sessionCount">-</span> Sessions <span id="cronCount">-</span> Cron Jobs</div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-item">
+      <div class="status-dot" id="gwDot"></div>
+      <span id="gwStatus">Connecting...</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot" id="tgDot"></div>
+      <span id="tgStatus">Telegram: ...</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot" id="waDot"></div>
+      <span id="waStatus">WhatsApp: ...</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot blue"></div>
+      <span id="modelInfo">Model: ...</span>
+    </div>
+  </div>
+
+  <div class="health-banner" id="healthBanner"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="sessions">Sessions</div>
+    <div class="tab" data-tab="cron">Cron Jobs</div>
+    <div class="tab" data-tab="agents">Agents</div>
+    <div class="tab" data-tab="skills">Skills</div>
+    <div class="tab" data-tab="logs">Logs</div>
+  </div>
+
+  <div class="main-grid">
+    <div class="content-area">
+      <div id="tab-sessions">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div class="section-title" style="margin-bottom:0">Sessions</div>
+          <div id="sessionFilters" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div id="sessionsGrid">
+          <div class="cards-grid">
+            <div class="card skeleton" style="height:140px"></div>
+            <div class="card skeleton" style="height:140px"></div>
+            <div class="card skeleton" style="height:140px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-cron" class="hidden">
+        <div class="section-title">Scheduled Jobs</div>
+        <div class="cards-grid" id="cronGrid"></div>
+      </div>
+
+      <div id="tab-agents" class="hidden">
+        <div class="section-title">Agents</div>
+        <div class="cards-grid" id="agentsGrid">
+          <div class="card skeleton" style="height:120px"></div>
+          <div class="card skeleton" style="height:120px"></div>
+        </div>
+      </div>
+
+      <div id="tab-skills" class="hidden">
+        <div class="section-title">Skills</div>
+        <div class="cards-grid" id="skillsGrid">
+          <div class="card skeleton" style="height:100px"></div>
+          <div class="card skeleton" style="height:100px"></div>
+        </div>
+      </div>
+
+      <div id="tab-logs" class="hidden">
+        <div class="section-title">Gateway Logs</div>
+        <div id="logsContainer">
+          <div class="card skeleton" style="height:300px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <div class="section-title">Quick Actions</div>
+        <div class="quick-actions">
+          <button class="action-btn" onclick="openSpawnModal()">
+            <span>+</span> Send Agent Message
+          </button>
+          <button class="action-btn secondary" onclick="refreshAll()">
+            Refresh All
+          </button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">Channels</div>
+        <div id="channelsList">
+          <div class="channel-row"><span>Loading...</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">Upcoming Cron</div>
+        <ul class="cron-mini" id="cronMiniList">
+          <li><span class="cron-name">Loading...</span></li>
+        </ul>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">Gateway Info</div>
+        <div id="gatewayInfo" style="font-size:0.8rem;color:#888;">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="refresh-bar" id="refreshBar">
+    <div class="refresh-spinner"></div>
+    <span id="refreshText">Loading...</span>
+  </div>
+
+  <!-- Chat Panel (slide-in from right) -->
+  <div class="chat-overlay" id="chatPanel">
+    <div class="chat-header">
+      <h3 id="chatTitle">Session Chat</h3>
+      <button class="chat-close" onclick="closeChat()">&times;</button>
+    </div>
+    <div class="chat-session-info" id="chatSessionInfo"></div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="typing-indicator" id="typingIndicator">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>
+    <div class="chat-input-area">
+      <div class="thinking-pills" id="thinkingPills">
+        <span style="font-size:0.7rem;color:#666;margin-right:4px">Thinking:</span>
+        <button class="thinking-pill active" data-level="off">Off</button>
+        <button class="thinking-pill" data-level="minimal">Minimal</button>
+        <button class="thinking-pill" data-level="low">Low</button>
+        <button class="thinking-pill" data-level="medium">Medium</button>
+        <button class="thinking-pill" data-level="high">High</button>
+      </div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chatInput" rows="2" placeholder="Message the agent..."></textarea>
+        <button class="chat-send" id="chatSendBtn" onclick="sendChatMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Send Message Modal -->
+  <div class="modal" id="spawnModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Send Agent Message</h2>
+        <button class="modal-close" onclick="closeSpawnModal()">&times;</button>
+      </div>
+      <div class="spawn-form">
+        <label>Message</label>
+        <textarea id="spawnMessage" rows="4" placeholder="What should the agent do?"></textarea>
+        <label>Agent ID (optional)</label>
+        <input id="spawnAgentId" type="text" placeholder="main" value="main">
+        <button class="action-btn" onclick="sendSpawnMessage()" id="spawnBtn" style="margin-top:8px">
+          Send to Agent
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── State ──
+    var statusData = null;
+    var healthData = null;
+    var cronData = null;
+    var sessionsData = null;
+    var agentsData = null;
+    var skillsData = null;
+    var logsData = null;
+    var currentChatSession = null;
+    var lastRefreshAt = 0;
+    var lastCronRefreshAt = 0;
+    var isFetching = false;
+    var currentThinkingLevel = 'off';
+
+    // Track which tabs have been loaded
+    var tabLoaded = { sessions: true, cron: true, agents: false, skills: false, logs: false };
+    // Track expanded cron history
+    var expandedCronHistory = {};
+
+    // All tab IDs
+    var ALL_TABS = ['sessions', 'cron', 'agents', 'skills', 'logs'];
+
+    // ── localStorage chat history ──
+    function getChatHistory(sessionId) {
+      try {
+        var data = localStorage.getItem('chat:' + sessionId);
+        return data ? JSON.parse(data) : [];
+      } catch (e) { return []; }
+    }
+
+    function saveChatHistory(sessionId, messages) {
+      try {
+        var trimmed = messages.slice(-50);
+        localStorage.setItem('chat:' + sessionId, JSON.stringify(trimmed));
+      } catch (e) { /* quota exceeded */ }
+    }
+
+    function addChatMessage(sessionId, role, text) {
+      var history = getChatHistory(sessionId);
+      history.push({ role: role, text: text, ts: Date.now() });
+      saveChatHistory(sessionId, history);
+    }
+
+    // ── API ──
+    async function api(path, opts) {
+      opts = opts || {};
+      var res = await fetch(path, opts);
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+      return data;
+    }
+
+    function toast(msg, isError) {
+      var el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast' + (isError ? ' error' : '');
+      el.classList.add('visible');
+      setTimeout(function() { el.classList.remove('visible'); }, 3000);
+    }
+
+    // ── Reusable UI helpers ──
+    function buildErrorState(message, retryFn) {
+      return h('div', { className: 'error-state' }, [
+        h('p', {}, message),
+        h('button', { className: 'retry-btn', onclick: retryFn }, 'Retry')
+      ]);
+    }
+
+    function buildSkeletonCards(count, height) {
+      var cards = [];
+      for (var i = 0; i < count; i++) {
+        cards.push(h('div', { className: 'card skeleton', style: { height: (height || 120) + 'px' } }));
+      }
+      return h('div', { className: 'cards-grid' }, cards);
+    }
+
+    // ── Data Fetching ──
+    async function fetchStatus() {
+      try {
+        statusData = await api('/api/status');
+        renderStatusBar();
+        renderGatewayInfo();
+      } catch (e) {
+        setText('gwStatus', 'Offline');
+        setClass('gwDot', 'status-dot red');
+      }
+    }
+
+    async function fetchHealth() {
+      try {
+        healthData = await api('/api/health');
+        renderChannels();
+      } catch (e) {
+        console.error('Health fetch failed:', e);
+      }
+    }
+
+    async function fetchCron() {
+      try {
+        cronData = await api('/api/cron');
+        lastCronRefreshAt = Date.now();
+        renderCronGrid();
+        renderCronMini();
+        setText('cronCount', String(cronData.jobs ? cronData.jobs.length : 0));
+      } catch (e) {
+        var grid = document.getElementById('cronGrid');
+        clearChildren(grid);
+        grid.appendChild(buildErrorState('Failed to load cron jobs', fetchCron));
+      }
+    }
+
+    async function fetchSessions() {
+      try {
+        sessionsData = await api('/api/sessions');
+        renderSessionsGrid();
+        setText('sessionCount', String(sessionsData.count || 0));
+      } catch (e) {
+        var container = document.getElementById('sessionsGrid');
+        clearChildren(container);
+        container.appendChild(buildErrorState('Failed to load sessions', fetchSessions));
+      }
+    }
+
+    async function fetchAgents() {
+      try {
+        agentsData = await api('/api/agents');
+        renderAgentsGrid();
+      } catch (e) {
+        var grid = document.getElementById('agentsGrid');
+        clearChildren(grid);
+        grid.appendChild(buildErrorState('Failed to load agents', fetchAgents));
+      }
+    }
+
+    async function fetchSkills() {
+      try {
+        skillsData = await api('/api/skills');
+        renderSkillsGrid();
+      } catch (e) {
+        var grid = document.getElementById('skillsGrid');
+        clearChildren(grid);
+        grid.appendChild(buildErrorState('Failed to load skills', fetchSkills));
+      }
+    }
+
+    async function fetchLogs() {
+      try {
+        logsData = await api('/api/logs');
+        renderLogs();
+      } catch (e) {
+        var container = document.getElementById('logsContainer');
+        clearChildren(container);
+        container.appendChild(buildErrorState('Failed to load logs', fetchLogs));
+      }
+    }
+
+    async function refreshAll(silent) {
+      isFetching = true;
+      updateRefreshBar();
+      await Promise.all([fetchStatus(), fetchHealth(), fetchCron(), fetchSessions()]);
+      lastRefreshAt = Date.now();
+      isFetching = false;
+      updateRefreshBar();
+      renderHealthBanner();
+      if (!silent) toast('Refreshed');
+    }
+
+    // ── DOM helpers ──
+    function setText(id, text) {
+      document.getElementById(id).textContent = text;
+    }
+
+    function setClass(id, cls) {
+      document.getElementById(id).className = cls;
+    }
+
+    function clearChildren(el) {
+      while (el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    function h(tag, attrs, children) {
+      var el = document.createElement(tag);
+      if (attrs) {
+        Object.keys(attrs).forEach(function(k) {
+          if (k === 'className') el.className = attrs[k];
+          else if (k === 'onclick') el.addEventListener('click', attrs[k]);
+          else if (k === 'style' && typeof attrs[k] === 'object') {
+            Object.assign(el.style, attrs[k]);
+          } else {
+            el.setAttribute(k, attrs[k]);
+          }
+        });
+      }
+      if (children) {
+        if (typeof children === 'string') {
+          el.textContent = children;
+        } else if (Array.isArray(children)) {
+          children.forEach(function(c) { if (c) el.appendChild(c); });
+        } else {
+          el.appendChild(children);
+        }
+      }
+      return el;
+    }
+
+    // ── Status Bar ──
+    function renderStatusBar() {
+      var gw = statusData && statusData.gateway;
+      if (gw && gw.reachable) {
+        setClass('gwDot', 'status-dot green pulse');
+        setText('gwStatus', 'Gateway: ' + gw.connectLatencyMs + 'ms');
+      } else {
+        setClass('gwDot', 'status-dot red');
+        setText('gwStatus', 'Gateway: Unreachable');
+      }
+      var model = (statusData && statusData.sessions && statusData.sessions.defaults && statusData.sessions.defaults.model) || '?';
+      setText('modelInfo', 'Model: ' + model);
+    }
+
+    // ── Channels ──
+    function renderChannels() {
+      if (!healthData || !healthData.channels) return;
+      var container = document.getElementById('channelsList');
+      clearChildren(container);
+      var channels = healthData.channels;
+      var order = healthData.channelOrder || Object.keys(channels);
+      var labels = healthData.channelLabels || {};
+
+      order.forEach(function(ch) {
+        var c = channels[ch];
+        var label = labels[ch] || ch;
+        var status = 'configured';
+        var dotClass = 'yellow';
+
+        if (ch === 'telegram') {
+          var ok = c.probe && c.probe.ok;
+          var bot = c.probe && c.probe.bot && c.probe.bot.username;
+          status = ok ? '@' + bot : 'Error';
+          dotClass = ok ? 'green' : 'red';
+          setClass('tgDot', 'status-dot ' + dotClass);
+          setText('tgStatus', 'Telegram: ' + (ok ? 'OK' : 'Error'));
+        }
+
+        if (ch === 'whatsapp') {
+          var linked = c.linked;
+          status = linked ? ((c.self && c.self.e164) || 'Linked') : 'Not linked';
+          dotClass = linked ? 'green' : 'red';
+          setClass('waDot', 'status-dot ' + dotClass);
+          setText('waStatus', 'WhatsApp: ' + (linked ? 'Linked' : 'Down'));
+        }
+
+        var row = h('div', { className: 'channel-row' }, [
+          h('span', {}, [
+            h('span', { className: 'status-dot ' + dotClass, style: { display: 'inline-block', verticalAlign: 'middle', marginRight: '6px' } }),
+            document.createTextNode(label)
+          ]),
+          h('span', { style: { color: '#888', fontSize: '0.8rem' } }, status)
+        ]);
+        container.appendChild(row);
+      });
+    }
+
+    // ── Session classification ──
+    var activeFilter = 'active';
+
+    function classifySession(s) {
+      var key = s.key;
+      if (key.endsWith(':main')) return 'main';
+      if (key.indexOf(':cron:') !== -1) return 'cron';
+      if (key.indexOf(':telegram:') !== -1) return 'telegram';
+      if (key.indexOf(':openai:') !== -1) return 'api';
+      if (key.endsWith(':new')) return 'other';
+      return 'other';
+    }
+
+    function getSessionMeta(s) {
+      var type = classifySession(s);
+      var ageHours = (s.ageMs || 0) / 3600000;
+      var isRecent = ageHours < 24;
+      var isActive = ageHours < 168;
+
+      var meta = { type: type, isRecent: isRecent, isActive: isActive };
+
+      switch (type) {
+        case 'main':
+          meta.name = 'JARVIS \u2014 Main Session';
+          meta.emoji = '\u{1F916}';
+          meta.iconClass = '';
+          meta.group = 'Core';
+          break;
+        case 'cron':
+          var cronId = (s.key.match(/:cron:(.+)$/) || [])[1] || '';
+          var jobName = '';
+          if (cronData && cronData.jobs) {
+            var job = cronData.jobs.find(function(j) { return j.id === cronId; });
+            if (job) jobName = job.name;
+          }
+          meta.name = jobName || ('Cron: ' + cronId.substring(0, 8));
+          meta.emoji = '\u23F0';
+          meta.iconClass = 'cron';
+          meta.group = 'Cron Sessions';
+          break;
+        case 'telegram':
+          var tgMatch = s.key.match(/:telegram:(.+?)(?::(.+))?$/);
+          var tgType = tgMatch ? tgMatch[1] : 'chat';
+          var tgId = tgMatch ? (tgMatch[2] || tgMatch[1]) : '';
+          meta.name = 'Telegram ' + tgType + (tgId ? ' ' + tgId.substring(0, 12) : '');
+          meta.emoji = '\u{1F4E8}';
+          meta.iconClass = 'channel';
+          meta.group = 'Telegram';
+          break;
+        case 'api':
+          var apiId = s.key.split(':').pop() || '';
+          meta.name = 'API: ' + apiId.substring(0, 8);
+          meta.emoji = '\u{1F517}';
+          meta.iconClass = 'session';
+          meta.group = 'API Sessions';
+          break;
+        default:
+          var lastPart = s.key.split(':').pop() || s.key;
+          meta.name = lastPart;
+          meta.emoji = '\u{1F4AC}';
+          meta.iconClass = 'session';
+          meta.group = 'Other';
+      }
+      return meta;
+    }
+
+    function renderSessionFilters(sessions) {
+      var filters = document.getElementById('sessionFilters');
+      clearChildren(filters);
+
+      var counts = { active: 0, all: sessions.length, main: 0, cron: 0, telegram: 0, api: 0 };
+      sessions.forEach(function(s) {
+        var meta = getSessionMeta(s);
+        if (meta.isActive) counts.active++;
+        counts[meta.type] = (counts[meta.type] || 0) + 1;
+      });
+
+      var filterDefs = [
+        ['active', 'Active (' + counts.active + ')'],
+        ['all', 'All (' + counts.all + ')'],
+        ['main', 'Core (' + counts.main + ')'],
+        ['cron', 'Cron (' + counts.cron + ')'],
+        ['telegram', 'Telegram (' + counts.telegram + ')'],
+        ['api', 'API (' + counts.api + ')']
+      ];
+
+      filterDefs.forEach(function(f) {
+        var pill = h('button', {
+          className: 'filter-pill' + (activeFilter === f[0] ? ' active' : ''),
+          onclick: function() { activeFilter = f[0]; renderSessionsGrid(); }
+        }, f[1]);
+        filters.appendChild(pill);
+      });
+    }
+
+    // ── Sessions Grid ──
+    function renderSessionsGrid() {
+      var container = document.getElementById('sessionsGrid');
+      clearChildren(container);
+
+      if (!sessionsData || !sessionsData.sessions || !sessionsData.sessions.length) {
+        container.appendChild(h('div', { style: { color: '#666', padding: '20px' } }, 'No sessions found'));
+        return;
+      }
+
+      var sessions = sessionsData.sessions;
+      renderSessionFilters(sessions);
+
+      var filtered = sessions.filter(function(s) {
+        var meta = getSessionMeta(s);
+        if (activeFilter === 'active') return meta.isActive;
+        if (activeFilter === 'all') return true;
+        return meta.type === activeFilter;
+      });
+
+      if (!filtered.length) {
+        container.appendChild(h('div', { style: { color: '#666', padding: '20px' } }, 'No sessions match this filter'));
+        return;
+      }
+
+      var groups = {};
+      filtered.forEach(function(s) {
+        var meta = getSessionMeta(s);
+        if (!groups[meta.group]) groups[meta.group] = [];
+        groups[meta.group].push({ session: s, meta: meta });
+      });
+
+      var groupOrder = ['Core', 'Cron Sessions', 'Telegram', 'API Sessions', 'Other'];
+      groupOrder.forEach(function(groupName) {
+        var items = groups[groupName];
+        if (!items || !items.length) return;
+
+        container.appendChild(h('div', { className: 'session-group-title' }, groupName + ' (' + items.length + ')'));
+
+        var grid = h('div', { className: 'cards-grid' });
+        items.forEach(function(item) {
+          grid.appendChild(buildSessionCard(item.session, item.meta));
+        });
+        container.appendChild(grid);
+      });
+    }
+
+    function buildSessionCard(s, meta) {
+      var age = formatAge(s.ageMs);
+      var pct = (s.totalTokens && s.contextTokens) ? Math.round((s.totalTokens / s.contextTokens) * 100) : 0;
+      var barClass = pct > 70 ? 'high' : pct > 40 ? 'medium' : 'low';
+      var tokenText = (s.totalTokens || 0).toLocaleString() + ' / ' + (s.contextTokens || 0).toLocaleString() + ' (' + pct + '%)';
+      var statusText = s.systemSent ? 'System loaded' : 'No system prompt';
+      if (s.abortedLastRun) statusText += ' | Aborted';
+      var statusDotClass = s.systemSent ? 'green' : 'yellow';
+      var tokenBarFill = h('div', { className: 'token-bar-fill ' + barClass, style: { width: pct + '%' } });
+      var tokenBar = h('div', { className: 'token-bar' }, [tokenBarFill]);
+
+      return h('div', { className: 'card', onclick: function() {
+        openChat(s.sessionId, s.key, s.model || '');
+      } }, [
+        h('div', { className: 'card-header' }, [
+          h('div', { className: 'card-icon ' + meta.iconClass }, meta.emoji),
+          h('div', { className: 'card-info' }, [
+            h('h3', {}, meta.name),
+            h('div', { className: 'card-sub' }, (s.model || 'unknown') + ' \u2022 ' + age)
+          ])
+        ]),
+        h('div', { className: 'card-status' }, [
+          h('span', { className: 'status-dot ' + statusDotClass, style: { display: 'inline-block' } }),
+          document.createTextNode(' ' + statusText)
+        ]),
+        h('div', { className: 'card-detail' }, [
+          document.createTextNode('Tokens: ' + tokenText),
+          tokenBar
+        ])
+      ]);
+    }
+
+    // ── Cron Grid ──
+    function renderCronGrid() {
+      var grid = document.getElementById('cronGrid');
+      clearChildren(grid);
+
+      if (!cronData || !cronData.jobs || !cronData.jobs.length) {
+        grid.appendChild(h('div', { style: { color: '#666', padding: '20px' } }, 'No cron jobs'));
+        return;
+      }
+
+      cronData.jobs.forEach(function(job) {
+        var next = (job.state && job.state.nextRunAtMs) ? new Date(job.state.nextRunAtMs).toLocaleString() : 'N/A';
+        var lastStatus = (job.state && job.state.lastStatus) || 'never';
+        var lastDur = (job.state && job.state.lastDurationMs) ? (job.state.lastDurationMs / 1000).toFixed(1) + 's' : '-';
+        var errors = (job.state && job.state.consecutiveErrors) || 0;
+        var dotClass = !job.enabled ? 'red' : errors > 0 ? 'yellow' : 'green';
+        var delivery = job.delivery ? (job.delivery.channel + ' \u2192 ' + job.delivery.to) : 'No delivery';
+
+        var payloadText = '';
+        if (job.payload) {
+          if (job.payload.message) payloadText = job.payload.message;
+          else if (job.payload.text) payloadText = job.payload.text;
+        }
+
+        var toggleKnob = h('div', { className: 'cron-toggle-knob' });
+        var toggle = h('button', {
+          className: 'cron-toggle' + (job.enabled ? ' on' : ''),
+          onclick: (function(j) {
+            return function(e) {
+              e.stopPropagation();
+              toggleCronJob(j.id, j.enabled, e.currentTarget);
+            };
+          })(job)
+        }, [toggleKnob]);
+
+        var runBtn = h('button', { className: 'cron-run-btn', onclick: (function(j) {
+          return function(e) {
+            e.stopPropagation();
+            runCronJob(j.id, e.target);
+          };
+        })(job) }, 'Run Now');
+
+        var historyBtn = h('button', { className: 'cron-run-btn', onclick: (function(j) {
+          return function(e) {
+            e.stopPropagation();
+            toggleCronHistory(j.id, e.target);
+          };
+        })(job) }, 'History');
+
+        var deleteBtn = h('button', { className: 'cron-run-btn', onclick: (function(j) {
+          return function(e) {
+            e.stopPropagation();
+            deleteCronJob(j.id, j.name, e.target);
+          };
+        })(job), style: { borderColor: 'rgba(255,71,87,0.3)', color: '#ff4757', background: 'rgba(255,71,87,0.1)' } }, 'Delete');
+
+        var payloadEl = null;
+        if (payloadText) {
+          payloadEl = h('div', { className: 'payload-preview', onclick: function(e) {
+            e.stopPropagation();
+            this.classList.toggle('expanded');
+          } }, payloadText.substring(0, 400));
+        }
+
+        var cardChildren = [
+          h('div', { className: 'card-header', style: { marginBottom: '8px' } }, [
+            h('div', { className: 'card-icon cron' }, '\u23F0'),
+            h('div', { className: 'card-info', style: { flex: '1' } }, [
+              h('h3', {}, job.name),
+              h('div', { className: 'card-sub' }, (job.schedule && job.schedule.expr || '') + ' ' + (job.schedule && job.schedule.tz || ''))
+            ]),
+            toggle
+          ]),
+          h('div', { className: 'card-status' }, [
+            h('span', { className: 'status-dot ' + dotClass, style: { display: 'inline-block' } }),
+            document.createTextNode(' ' + (job.enabled ? 'Enabled' : 'Disabled') + ' \u2022 Last: ' + lastStatus + ' (' + lastDur + ')' + (errors > 0 ? ' \u2022 ' + errors + ' errors' : ''))
+          ]),
+          h('div', { className: 'card-detail' }, [
+            document.createTextNode('Next: ' + next),
+            h('br'),
+            document.createTextNode('Delivery: ' + delivery)
+          ])
+        ];
+
+        if (payloadEl) cardChildren.push(payloadEl);
+
+        // History container
+        var historyContainer = h('div', { className: 'cron-history hidden', id: 'cron-history-' + job.id });
+        cardChildren.push(h('div', { style: { marginTop: '10px', display: 'flex', gap: '8px' } }, [runBtn, historyBtn, deleteBtn]));
+        cardChildren.push(historyContainer);
+
+        var card = h('div', { className: 'card', style: { cursor: 'default', opacity: job.enabled ? '1' : '0.5' } }, cardChildren);
+
+        grid.appendChild(card);
+      });
+    }
+
+    // ── Cron Run History ──
+    async function toggleCronHistory(jobId, btn) {
+      var container = document.getElementById('cron-history-' + jobId);
+      if (!container) return;
+
+      if (expandedCronHistory[jobId]) {
+        container.classList.add('hidden');
+        delete expandedCronHistory[jobId];
+        btn.textContent = 'History';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      try {
+        var data = await api('/api/cron/' + encodeURIComponent(jobId) + '/runs');
+        clearChildren(container);
+        var runs = data.runs || data || [];
+        if (Array.isArray(runs) && runs.length > 0) {
+          runs.forEach(function(run) {
+            var statusDot = (run.status === 'ok' || run.status === 'success') ? 'green' : run.status === 'error' ? 'red' : 'yellow';
+            var ts = run.startedAt ? new Date(run.startedAt).toLocaleString() : '?';
+            var dur = run.durationMs ? (run.durationMs / 1000).toFixed(1) + 's' : '-';
+            container.appendChild(h('div', { className: 'cron-history-row' }, [
+              h('span', { className: 'status-dot ' + statusDot, style: { display: 'inline-block', flexShrink: '0' } }),
+              h('span', { style: { flex: '1' } }, ts),
+              h('span', { style: { color: '#666' } }, dur),
+              h('span', { style: { color: statusDot === 'green' ? '#00ff88' : statusDot === 'red' ? '#ff4757' : '#ffcc00', minWidth: '50px', textAlign: 'right' } }, run.status || '?')
+            ]));
+          });
+        } else {
+          container.appendChild(h('div', { style: { color: '#666', fontSize: '0.75rem', padding: '6px 0' } }, 'No run history'));
+        }
+        container.classList.remove('hidden');
+        expandedCronHistory[jobId] = true;
+        btn.textContent = 'History';
+      } catch (e) {
+        container.classList.remove('hidden');
+        clearChildren(container);
+        container.appendChild(h('div', { style: { color: '#ff4757', fontSize: '0.75rem', padding: '6px 0' } }, 'Failed to load history'));
+        btn.textContent = 'History';
+      }
+      btn.disabled = false;
+    }
+
+    // ── Agents Grid ──
+    function renderAgentsGrid() {
+      var grid = document.getElementById('agentsGrid');
+      clearChildren(grid);
+
+      var agents = agentsData && (agentsData.agents || agentsData);
+      if (!agents || (Array.isArray(agents) && !agents.length)) {
+        grid.appendChild(h('div', { style: { color: '#666', padding: '20px' } }, 'No agents found'));
+        return;
+      }
+
+      if (!Array.isArray(agents)) {
+        agents = Object.keys(agents).map(function(k) {
+          var a = agents[k];
+          if (typeof a === 'object') { a.id = a.id || k; return a; }
+          return { id: k, name: k };
+        });
+      }
+
+      agents.forEach(function(agent) {
+        var name = agent.name || agent.id || '?';
+        var emoji = agent.emoji || '\u{1F916}';
+        var role = agent.role || agent.description || '';
+        var status = agent.status || 'configured';
+        var statusDot = status === 'active' || status === 'running' ? 'green' : status === 'error' ? 'red' : 'yellow';
+
+        // Count sessions for this agent
+        var sessionCount = 0;
+        if (sessionsData && sessionsData.sessions) {
+          sessionsData.sessions.forEach(function(s) {
+            if (s.key && s.key.indexOf(':' + (agent.id || '').toLowerCase()) !== -1) sessionCount++;
+          });
+        }
+
+        var card = h('div', { className: 'card', onclick: function() {
+          activeFilter = 'all';
+          switchTab('sessions');
+          renderSessionsGrid();
+        } }, [
+          h('div', { className: 'card-header' }, [
+            h('div', { className: 'card-icon agent' }, emoji),
+            h('div', { className: 'card-info' }, [
+              h('h3', {}, name),
+              h('div', { className: 'card-sub' }, role || 'Agent')
+            ])
+          ]),
+          h('div', { className: 'card-status' }, [
+            h('span', { className: 'status-dot ' + statusDot, style: { display: 'inline-block' } }),
+            document.createTextNode(' ' + status + (sessionCount > 0 ? ' \u2022 ' + sessionCount + ' sessions' : ''))
+          ])
+        ]);
+        grid.appendChild(card);
+      });
+    }
+
+    // ── Skills Grid ──
+    function renderSkillsGrid() {
+      var grid = document.getElementById('skillsGrid');
+      clearChildren(grid);
+
+      var skills = skillsData && (skillsData.skills || skillsData);
+      if (!skills || (Array.isArray(skills) && !skills.length)) {
+        grid.appendChild(h('div', { style: { color: '#666', padding: '20px' } }, 'No skills found'));
+        return;
+      }
+
+      if (!Array.isArray(skills)) {
+        skills = Object.keys(skills).map(function(k) {
+          var s = skills[k];
+          if (typeof s === 'object') { s.id = s.id || k; return s; }
+          return { id: k, name: k };
+        });
+      }
+
+      skills.forEach(function(skill) {
+        var name = skill.name || skill.id || '?';
+        var desc = skill.description || '';
+        var eligible = skill.eligible !== false;
+        var statusDot = eligible ? 'green' : 'yellow';
+        var statusText = eligible ? 'Eligible' : 'Not eligible';
+
+        var card = h('div', { className: 'card', style: { cursor: 'default' } }, [
+          h('div', { className: 'card-header' }, [
+            h('div', { className: 'card-icon skill' }, '\u{1F9E9}'),
+            h('div', { className: 'card-info' }, [
+              h('h3', {}, name),
+              h('div', { className: 'card-sub' }, desc.substring(0, 100) || 'Skill')
+            ])
+          ]),
+          h('div', { className: 'card-status' }, [
+            h('span', { className: 'status-dot ' + statusDot, style: { display: 'inline-block' } }),
+            document.createTextNode(' ' + statusText)
+          ])
+        ]);
+        grid.appendChild(card);
+      });
+    }
+
+    // ── Logs ──
+    function renderLogs() {
+      var container = document.getElementById('logsContainer');
+      clearChildren(container);
+
+      var entries = logsData && (logsData.entries || logsData.logs || logsData);
+      if (!entries || (Array.isArray(entries) && !entries.length)) {
+        container.appendChild(h('div', { style: { color: '#666', padding: '20px' } }, 'No logs available'));
+        return;
+      }
+
+      if (!Array.isArray(entries)) {
+        container.appendChild(h('div', { style: { color: '#666', padding: '20px' } }, 'Unexpected log format'));
+        return;
+      }
+
+      var panel = h('div', { className: 'panel', style: { maxHeight: '500px', overflowY: 'auto', padding: '10px' } });
+
+      entries.forEach(function(entry) {
+        var level = (entry.level || entry.severity || 'info').toLowerCase();
+        var levelClass = level === 'error' || level === 'critical' ? 'log-error' : level === 'warn' || level === 'warning' ? 'log-warn' : 'log-info';
+        var ts = entry.timestamp || entry.ts || entry.time || '';
+        if (ts) {
+          try { ts = new Date(ts).toLocaleTimeString(); } catch (e) { /* keep raw */ }
+        }
+        var msg = entry.message || entry.msg || entry.text || JSON.stringify(entry);
+
+        var row = h('div', { className: 'log-entry ' + levelClass }, [
+          h('span', { className: 'log-ts' }, ts),
+          h('span', { className: 'log-level' }, level.toUpperCase()),
+          document.createTextNode(msg)
+        ]);
+        panel.appendChild(row);
+      });
+
+      container.appendChild(panel);
+    }
+
+    // ── Cron Mini (sidebar) ──
+    function renderCronMini() {
+      var list = document.getElementById('cronMiniList');
+      clearChildren(list);
+
+      if (!cronData || !cronData.jobs || !cronData.jobs.length) {
+        list.appendChild(h('li', {}, h('span', { className: 'cron-name', style: { color: '#666' } }, 'No jobs')));
+        return;
+      }
+
+      var upcoming = cronData.jobs
+        .filter(function(j) { return j.enabled && j.state && j.state.nextRunAtMs; })
+        .sort(function(a, b) { return a.state.nextRunAtMs - b.state.nextRunAtMs; })
+        .slice(0, 8);
+
+      upcoming.forEach(function(job) {
+        var next = formatRelativeTime(job.state.nextRunAtMs);
+        list.appendChild(h('li', {}, [
+          h('span', { className: 'cron-name' }, job.name),
+          h('span', { className: 'cron-next' }, next)
+        ]));
+      });
+    }
+
+    // ── Gateway Info ──
+    function renderGatewayInfo() {
+      var el = document.getElementById('gatewayInfo');
+      clearChildren(el);
+
+      if (!statusData) {
+        el.textContent = 'No data';
+        return;
+      }
+
+      var gw = statusData.gateway || {};
+      var svc = statusData.gatewayService || {};
+      var os = statusData.os || {};
+      var agents = statusData.agents || {};
+
+      var lines = [
+        ['URL', gw.url || '?'],
+        ['Service', svc.runtimeShort || '?'],
+        ['OS', os.label || '?'],
+        ['Agents', (agents.agents ? agents.agents.length : 0) + ' (' + (agents.totalSessions || 0) + ' sessions)'],
+        ['Heartbeat', (statusData.heartbeat && statusData.heartbeat.agents && statusData.heartbeat.agents[0] && statusData.heartbeat.agents[0].every) || '?']
+      ];
+
+      lines.forEach(function(pair) {
+        var row = h('div', { style: { marginBottom: '6px' } }, [
+          h('strong', {}, pair[0] + ': '),
+          document.createTextNode(pair[1])
+        ]);
+        el.appendChild(row);
+      });
+    }
+
+    // ── Health Banner ──
+    function renderHealthBanner() {
+      var banner = document.getElementById('healthBanner');
+      clearChildren(banner);
+      banner.className = 'health-banner';
+
+      if (!sessionsData || !sessionsData.sessions) return;
+
+      var warnings = [];
+      sessionsData.sessions.forEach(function(s) {
+        if (!s.totalTokens || !s.contextTokens) return;
+        var pct = Math.round((s.totalTokens / s.contextTokens) * 100);
+        if (pct >= 50) {
+          var meta = getSessionMeta(s);
+          warnings.push({ name: meta.name, pct: pct, sessionId: s.sessionId });
+        }
+      });
+
+      if (!warnings.length) return;
+
+      warnings.sort(function(a, b) { return b.pct - a.pct; });
+      var hasCritical = warnings.some(function(w) { return w.pct >= 75; });
+      banner.className = 'health-banner ' + (hasCritical ? 'critical' : 'warn');
+
+      var title = h('div', { style: { fontWeight: '600', marginBottom: '6px', fontSize: '0.9rem' } },
+        (hasCritical ? '\u26A0 ' : '\u{1F4CA} ') + 'Context Window ' + (hasCritical ? 'Warning' : 'Usage'));
+      banner.appendChild(title);
+
+      warnings.forEach(function(w) {
+        var color = w.pct >= 75 ? '#ff6b6b' : w.pct >= 60 ? '#ffdd57' : '#aaa';
+        var barOuter = h('div', { style: { flex: '1', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', maxWidth: '200px' } }, [
+          h('div', { style: { width: w.pct + '%', height: '100%', borderRadius: '3px', background: color } })
+        ]);
+        var row = h('div', { className: 'health-banner-item' }, [
+          h('span', { style: { minWidth: '180px' } }, w.name),
+          barOuter,
+          h('span', { style: { color: color, fontWeight: '600', minWidth: '45px', textAlign: 'right' } }, w.pct + '%')
+        ]);
+        banner.appendChild(row);
+      });
+    }
+
+    // ── Refresh indicator ──
+    function updateRefreshBar() {
+      var bar = document.getElementById('refreshBar');
+      var text = document.getElementById('refreshText');
+
+      if (isFetching) {
+        bar.className = 'refresh-bar fetching';
+        text.textContent = 'Refreshing...';
+        return;
+      }
+
+      if (!lastRefreshAt) {
+        text.textContent = 'Loading...';
+        return;
+      }
+
+      var ago = Math.round((Date.now() - lastRefreshAt) / 1000);
+      var stale = ago > 30;
+      bar.className = 'refresh-bar' + (stale ? ' stale' : '');
+      text.textContent = 'Updated ' + ago + 's ago' + (stale ? ' (stale)' : '') + ' \u2022 Auto-refresh 15s';
+    }
+
+    // ── Chat Panel ──
+    function openChat(sessionId, sessionKey, model) {
+      currentChatSession = { sessionId: sessionId, sessionKey: sessionKey, model: model };
+
+      setText('chatTitle', '\u{1F4AC} ' + formatSessionKeyForChat(sessionKey));
+      var info = document.getElementById('chatSessionInfo');
+      info.textContent = 'Session: ' + sessionId + ' \u2022 Model: ' + (model || '?') + ' \u2022 Key: ' + sessionKey;
+
+      var msgArea = document.getElementById('chatMessages');
+      clearChildren(msgArea);
+
+      // Restore chat history
+      var history = getChatHistory(sessionId);
+      if (history.length > 0) {
+        history.forEach(function(msg) {
+          msgArea.appendChild(h('div', { className: 'chat-msg ' + msg.role }, msg.text));
+        });
+      } else {
+        msgArea.appendChild(h('div', { className: 'chat-msg system' }, 'Send a message to interact with this agent session.'));
+      }
+
+      document.getElementById('chatInput').value = '';
+      document.getElementById('chatPanel').classList.add('active');
+      document.getElementById('chatInput').focus();
+      msgArea.scrollTop = msgArea.scrollHeight;
+    }
+
+    function closeChat() {
+      document.getElementById('chatPanel').classList.remove('active');
+      currentChatSession = null;
+    }
+
+    async function sendChatMessage() {
+      var input = document.getElementById('chatInput');
+      var msg = input.value.trim();
+      if (!msg || !currentChatSession) return;
+
+      var msgArea = document.getElementById('chatMessages');
+      var sendBtn = document.getElementById('chatSendBtn');
+      var typing = document.getElementById('typingIndicator');
+
+      // Guard against double-fire
+      if (sendBtn.disabled) return;
+
+      // Add user message
+      msgArea.appendChild(h('div', { className: 'chat-msg user' }, msg));
+      addChatMessage(currentChatSession.sessionId, 'user', msg);
+
+      input.value = '';
+      sendBtn.disabled = true;
+      typing.classList.add('active');
+      msgArea.scrollTop = msgArea.scrollHeight;
+
+      try {
+        var body = {
+          message: msg,
+          sessionId: currentChatSession.sessionId
+        };
+        if (currentThinkingLevel !== 'off') {
+          body.thinking = currentThinkingLevel;
+        }
+        var data = await api('/api/agent/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        typing.classList.remove('active');
+
+        var responseText = extractAgentResponse(data);
+        var agentEl = h('div', { className: 'chat-msg agent' });
+        agentEl.textContent = responseText;
+        msgArea.appendChild(agentEl);
+        addChatMessage(currentChatSession.sessionId, 'agent', responseText);
+      } catch (e) {
+        typing.classList.remove('active');
+        msgArea.appendChild(h('div', { className: 'chat-msg error' }, 'Error: ' + e.message));
+        // Don't persist error messages to history
+      }
+
+      sendBtn.disabled = false;
+      msgArea.scrollTop = msgArea.scrollHeight;
+    }
+
+    function extractAgentResponse(data) {
+      if (typeof data === 'string') return data;
+      if (data.raw) return data.raw;
+      if (data.response) return data.response;
+      if (data.text) return data.text;
+      if (data.content) {
+        if (typeof data.content === 'string') return data.content;
+        if (Array.isArray(data.content)) {
+          return data.content
+            .filter(function(c) { return c.type === 'text'; })
+            .map(function(c) { return c.text; })
+            .join('\n');
+        }
+      }
+      if (data.result) return extractAgentResponse(data.result);
+      return JSON.stringify(data, null, 2);
+    }
+
+    // Enter to send
+    document.getElementById('chatInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+
+    // Thinking level pills
+    document.querySelectorAll('.thinking-pill').forEach(function(pill) {
+      pill.addEventListener('click', function() {
+        document.querySelectorAll('.thinking-pill').forEach(function(p) { p.classList.remove('active'); });
+        pill.classList.add('active');
+        currentThinkingLevel = pill.dataset.level;
+      });
+    });
+
+    // ── Cron Run ──
+    async function runCronJob(jobId, btn) {
+      btn.disabled = true;
+      btn.textContent = 'Running...';
+      try {
+        await api('/api/cron/' + encodeURIComponent(jobId) + '/run', { method: 'POST' });
+        toast('Cron job triggered');
+        btn.textContent = 'Done';
+        setTimeout(function() { btn.textContent = 'Run Now'; btn.disabled = false; }, 3000);
+      } catch (e) {
+        toast('Failed: ' + e.message, true);
+        btn.textContent = 'Failed';
+        setTimeout(function() { btn.textContent = 'Run Now'; btn.disabled = false; }, 3000);
+      }
+    }
+
+    async function toggleCronJob(jobId, currentlyEnabled, toggleEl) {
+      var action = currentlyEnabled ? 'disable' : 'enable';
+      try {
+        await api('/api/cron/' + encodeURIComponent(jobId) + '/' + action, { method: 'POST' });
+        toast((currentlyEnabled ? 'Disabled' : 'Enabled') + ' cron job');
+        await fetchCron();
+      } catch (e) {
+        toast('Failed: ' + e.message, true);
+      }
+    }
+
+    async function deleteCronJob(jobId, jobName, btn) {
+      if (!confirm('Delete cron job "' + jobName + '"?\n\nThis cannot be undone.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+      try {
+        await api('/api/cron/' + encodeURIComponent(jobId), { method: 'DELETE' });
+        toast('Deleted: ' + jobName);
+        await fetchCron();
+      } catch (e) {
+        toast('Failed: ' + e.message, true);
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+      }
+    }
+
+    // ── Spawn Modal ──
+    function openSpawnModal() {
+      document.getElementById('spawnModal').classList.add('active');
+      document.getElementById('spawnMessage').focus();
+    }
+
+    function closeSpawnModal() {
+      document.getElementById('spawnModal').classList.remove('active');
+    }
+
+    async function sendSpawnMessage() {
+      var btn = document.getElementById('spawnBtn');
+      if (btn.disabled) return; // Guard double-fire
+
+      var msg = document.getElementById('spawnMessage').value.trim();
+      var agentId = document.getElementById('spawnAgentId').value.trim();
+      if (!msg) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      try {
+        var body = { message: msg };
+        if (agentId) body.agentId = agentId;
+        await api('/api/agent/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        toast('Message sent to agent');
+        closeSpawnModal();
+        document.getElementById('spawnMessage').value = '';
+        document.getElementById('spawnAgentId').value = 'main'; // Reset to default
+      } catch (e) {
+        toast('Failed: ' + e.message, true);
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Send to Agent';
+    }
+
+    // ── Tabs ──
+    function switchTab(target) {
+      document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelector('.tab[data-tab="' + target + '"]').classList.add('active');
+
+      ALL_TABS.forEach(function(tabId) {
+        document.getElementById('tab-' + tabId).classList.toggle('hidden', tabId !== target);
+      });
+
+      // Lazy-load data on first visit
+      if (!tabLoaded[target]) {
+        tabLoaded[target] = true;
+        if (target === 'agents') fetchAgents();
+        else if (target === 'skills') fetchSkills();
+        else if (target === 'logs') fetchLogs();
+      }
+    }
+
+    document.querySelectorAll('.tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        switchTab(tab.dataset.tab);
+      });
+    });
+
+    // ── Global keyboard shortcuts ──
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        if (document.getElementById('chatPanel').classList.contains('active')) {
+          closeChat();
+        } else if (document.getElementById('spawnModal').classList.contains('active')) {
+          closeSpawnModal();
+        }
+      }
+    });
+
+    // ── Helpers ──
+    function formatSessionKeyForChat(key) {
+      if (!sessionsData || !sessionsData.sessions) return key;
+      var s = sessionsData.sessions.find(function(sess) { return sess.key === key; });
+      if (s) return getSessionMeta(s).name;
+      return key.split(':').pop() || key;
+    }
+
+    function formatAge(ms) {
+      if (!ms) return '?';
+      var mins = Math.floor(ms / 60000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return mins + 'm ago';
+      var hours = Math.floor(mins / 60);
+      if (hours < 24) return hours + 'h ago';
+      var days = Math.floor(hours / 24);
+      return days + 'd ago';
+    }
+
+    function formatRelativeTime(tsMs) {
+      var diff = tsMs - Date.now();
+      if (diff < 0) return 'Overdue';
+      var mins = Math.floor(diff / 60000);
+      if (mins < 60) return 'In ' + mins + 'm';
+      var hours = Math.floor(mins / 60);
+      if (hours < 24) return 'In ' + hours + 'h';
+      var days = Math.floor(hours / 24);
+      return 'In ' + days + 'd';
+    }
+
+    // ── Init & Auto-refresh ──
+    refreshAll();
+
+    // Single data interval (15s) — skip when tab backgrounded
+    var dataIntervalId = setInterval(function() {
+      if (document.hidden) return;
+      fetchStatus();
+      fetchSessions();
+      // Refresh cron every 60s (check staleness)
+      if (Date.now() - lastCronRefreshAt > 60000) {
+        fetchCron();
+      }
+    }, 15000);
+
+    // Single tick interval (1s) for refresh counter
+    var tickIntervalId = setInterval(updateRefreshBar, 1000);
+
+    // Clean up intervals on page unload
+    window.addEventListener('beforeunload', function() {
+      clearInterval(dataIntervalId);
+      clearInterval(tickIntervalId);
+    });
+  </script>
+</body>
+</html>
