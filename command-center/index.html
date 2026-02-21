@@ -3574,9 +3574,10 @@
       }
 
       try {
-        var body = { message: msg };
+        // Prefix message with NPC role context so the agent responds in character
+        var contextMsg = '[Speaking to ' + npcName + ' (' + npc.role + ')] ' + msg;
+        var body = { message: contextMsg };
         if (sessionId) body.sessionId = sessionId;
-        else body.agentId = npcId;
 
         var data = await api('/api/agent/message', {
           method: 'POST',
