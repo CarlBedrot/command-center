@@ -3428,14 +3428,37 @@
     // ═══════════════════════════════════════════
     var speechBubbles = [];
 
+    function getNPCStatusColor(status) {
+      return status === 'online' ? '#00ff88' : status === 'scheduled' ? '#fdcb6e' : status === 'idle' ? '#888' : '#ff4757';
+    }
+
     function addSpeechBubble(npcId, text, duration) {
       speechBubbles = speechBubbles.filter(function(b) { return b.npcId !== npcId; });
       var npc = npcCharacters.find(function(n) { return n.id === npcId; });
       if (!npc) return;
+      var displayText = text.length > 180 ? text.substring(0, 177) + '...' : text;
+
+      // Pre-compute word-wrapped lines for cached rendering
+      var maxWidth = 220;
+      var words = displayText.split(' ');
+      var lines = [];
+      var currentLine = '';
+      for (var w = 0; w < words.length; w++) {
+        var testLine = currentLine ? currentLine + ' ' + words[w] : words[w];
+        // Approximate width: 7px per char at 12px font
+        if (testLine.length * 7 > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = words[w];
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+
       speechBubbles.push({
         npcId: npcId,
-        text: text.length > 180 ? text.substring(0, 177) + '...' : text,
-        fullText: text,
+        text: displayText,
+        lines: lines,
         life: duration || 8,
         maxLife: duration || 8,
         x: npc.cx,
@@ -3452,34 +3475,21 @@
 
     function renderSpeechBubbles(ctx) {
       ctx.save();
+      ctx.font = '12px "SF Pro Display", -apple-system, sans-serif';
       for (var i = 0; i < speechBubbles.length; i++) {
         var b = speechBubbles[i];
         var alpha = Math.min(1, b.life / 1.0);
         if (b.life > b.maxLife - 0.3) alpha = (b.maxLife - b.life) / 0.3;
 
         ctx.globalAlpha = Math.max(0, alpha);
-        ctx.font = '12px "SF Pro Display", -apple-system, sans-serif';
 
-        var maxWidth = 220;
-        var words = b.text.split(' ');
-        var lines = [];
-        var currentLine = '';
-        for (var w = 0; w < words.length; w++) {
-          var testLine = currentLine ? currentLine + ' ' + words[w] : words[w];
-          if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-            lines.push(currentLine);
-            currentLine = words[w];
-          } else {
-            currentLine = testLine;
-          }
-        }
-        if (currentLine) lines.push(currentLine);
-
+        // Use pre-computed lines from addSpeechBubble
+        var lines = b.lines;
         var lineHeight = 16;
         var padding = 10;
         var bubbleW = 0;
-        for (var l = 0; l < lines.length; l++) {
-          var lw = ctx.measureText(lines[l]).width;
+        for (var j = 0; j < lines.length; j++) {
+          var lw = ctx.measureText(lines[j]).width;
           if (lw > bubbleW) bubbleW = lw;
         }
         bubbleW += padding * 2;
@@ -3506,8 +3516,8 @@
         ctx.fillStyle = '#e0e0e0';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        for (var l = 0; l < lines.length; l++) {
-          ctx.fillText(lines[l], bx + padding, by + padding + l * lineHeight);
+        for (var j = 0; j < lines.length; j++) {
+          ctx.fillText(lines[j], bx + padding, by + padding + j * lineHeight);
         }
       }
       ctx.globalAlpha = 1;
@@ -3518,7 +3528,7 @@
     // NPC CHAT
     // ═══════════════════════════════════════════
     function openNPCChat(npc) {
-      activeNPCChat = { npc: npc, expanded: false };
+      activeNPCChat = { npc: npc };
       var bar = document.getElementById('npcChatBar');
       var label = document.getElementById('npcChatLabel');
       var input = document.getElementById('npcChatInput');
@@ -3542,6 +3552,8 @@
       if (!msg) return;
 
       var npc = activeNPCChat.npc;
+      var npcId = npc.id;
+      var npcName = npc.name;
       var sendBtn = document.getElementById('npcSendBtn');
       if (sendBtn.disabled) return;
       sendBtn.disabled = true;
@@ -3559,7 +3571,7 @@
       try {
         var body = { message: msg };
         if (sessionId) body.sessionId = sessionId;
-        else body.agentId = npc.id;
+        else body.agentId = npcId;
 
         var data = await api('/api/agent/message', {
           method: 'POST',
@@ -3568,26 +3580,37 @@
         });
 
         var responseText = extractAgentResponse(data);
-        addSpeechBubble(npc.id, responseText, responseText.length > 100 ? 12 : 8);
+        addSpeechBubble(npcId, responseText, responseText.length > 100 ? 12 : 8);
+
+        // Add to activity feed
+        activityFeed.unshift({ msg: npcName + ': replied', color: npc.color, ts: Date.now() });
+        if (activityFeed.length > 5) activityFeed.pop();
 
         if (sessionId) {
           addChatMessage(sessionId, 'user', msg);
           addChatMessage(sessionId, 'agent', responseText);
         }
       } catch (e) {
-        addSpeechBubble(npc.id, 'Error: ' + e.message, 5);
+        addSpeechBubble(npcId, 'Error: ' + e.message, 5);
       }
 
       sendBtn.disabled = false;
-      input.focus();
+      if (activeNPCChat && activeNPCChat.npc.id === npcId) input.focus();
     }
 
     // ═══════════════════════════════════════════
     // NPC RENDERING
     // ═══════════════════════════════════════════
     function renderNPCs(ctx) {
+      var vx = camera.x - 100;
+      var vy = camera.y - 100;
+      var vw = canvas.width + 200;
+      var vh = canvas.height + 200;
       for (var i = 0; i < npcCharacters.length; i++) {
         var npc = npcCharacters[i];
+        // Viewport culling
+        if (npc.cx < vx || npc.cx > vx + vw || npc.cy < vy || npc.cy > vy + vh) continue;
+
         var isNear = nearestNPC === npc && !activeOverlay;
         var bob = Math.sin(animTimer * 1.5 + npc.bobPhase) * 3;
 
@@ -3628,10 +3651,9 @@
         ctx.fillText(npc.role, npc.cx, npc.cy + bob + NPC_SIZE + 14);
 
         // Status dot
-        var statusColor = npc.status === 'online' ? '#00ff88' : npc.status === 'scheduled' ? '#fdcb6e' : npc.status === 'idle' ? '#888' : '#ff4757';
         ctx.beginPath();
         ctx.arc(npc.cx + NPC_SIZE - 4, npc.cy + bob - NPC_SIZE + 4, 4, 0, Math.PI * 2);
-        ctx.fillStyle = statusColor;
+        ctx.fillStyle = getNPCStatusColor(npc.status);
         ctx.fill();
         ctx.strokeStyle = '#12121f';
         ctx.lineWidth = 1.5;
@@ -4090,6 +4112,7 @@
 
       var npcHit = getNPCAtScreen(sx, sy);
       if (npcHit) {
+        hoveredStation = null;
         canvas.style.cursor = 'pointer';
         var nameEl = document.getElementById('tooltipName');
         clearChildren(nameEl);
@@ -4099,7 +4122,7 @@
         dot.style.height = '6px';
         dot.style.borderRadius = '50%';
         dot.style.display = 'inline-block';
-        dot.style.background = npcHit.status === 'online' ? '#00ff88' : npcHit.status === 'scheduled' ? '#fdcb6e' : '#888';
+        dot.style.background = getNPCStatusColor(npcHit.status);
         nameEl.appendChild(dot);
         nameEl.appendChild(document.createTextNode(' ' + npcHit.emoji + ' ' + npcHit.name));
         document.getElementById('tooltipStats').textContent = npcHit.role + ' \u2022 ' + (npcHit.statusText || npcHit.status);
