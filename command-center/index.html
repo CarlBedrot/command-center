@@ -9,54 +9,133 @@
 
     body {
       font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f0f1a 100%);
+      background: #0a0a12;
       color: #e0e0e0;
-      min-height: 100vh;
-      padding: 20px;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
     }
 
-    .header {
-      text-align: center;
-      margin-bottom: 24px;
+    /* ── Canvas ── */
+    #gameCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      display: block;
     }
 
-    .header h1 {
-      font-size: 1.8rem;
-      font-weight: 600;
-      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 5px;
+    /* ── HUD ── */
+    #hud {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
     }
 
-    .header .subtitle {
-      color: #666;
-      font-size: 0.85rem;
-    }
+    #hud > * { pointer-events: auto; }
 
-    .status-bar {
+    .hud-top-left {
+      position: absolute;
+      top: 16px;
+      left: 16px;
       display: flex;
-      justify-content: center;
-      gap: 24px;
-      margin-bottom: 24px;
-      padding: 12px 20px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.05);
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 5px;
     }
 
-    .status-item {
+    .hud-top-right {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: flex-end;
+    }
+
+    .hud-bottom-center {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+
+    .hud-bottom-left {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hud-bottom-right {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+    }
+
+    .hud-status-item {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.8rem;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: #aaa;
+      background: rgba(0,0,0,0.6);
+      padding: 4px 10px;
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
     }
 
+    .hud-info {
+      font-size: 0.7rem;
+      color: #888;
+      background: rgba(0,0,0,0.5);
+      padding: 3px 8px;
+      border-radius: 4px;
+      backdrop-filter: blur(4px);
+    }
+
+    .interact-prompt {
+      display: none;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #00d4ff;
+      font-size: 0.9rem;
+      font-weight: 500;
+      animation: promptPulse 2s infinite;
+    }
+
+    .interact-prompt.visible { display: block; }
+
+    @keyframes promptPulse {
+      0%, 100% { border-color: rgba(0,212,255,0.3); }
+      50% { border-color: rgba(0,212,255,0.6); }
+    }
+
+    .hud-hints {
+      font-size: 0.65rem;
+      color: #555;
+      background: rgba(0,0,0,0.4);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    /* ── Status Dots ── */
     .status-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
     }
 
     .status-dot.green { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
@@ -64,61 +143,76 @@
     .status-dot.blue { background: #00d4ff; box-shadow: 0 0 10px #00d4ff55; }
     .status-dot.red { background: #ff4757; box-shadow: 0 0 10px #ff475755; }
 
-    .tabs {
+    /* ── Minimap ── */
+    #minimapCanvas {
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 6px;
+      background: rgba(0,0,0,0.6);
+    }
+
+    /* ── Station Overlays ── */
+    .station-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 500;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      padding: 40px 20px;
+    }
+
+    .station-overlay.active { display: flex; }
+
+    .overlay-panel {
+      background: #12121f;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      max-width: 900px;
+      width: 100%;
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+    }
+
+    .overlay-header {
       display: flex;
-      gap: 4px;
-      margin-bottom: 20px;
-      max-width: 1400px;
-      margin-left: auto;
-      margin-right: auto;
-      overflow-x: auto;
-      white-space: nowrap;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: sticky;
+      top: 0;
+      background: #12121f;
+      z-index: 1;
+      border-radius: 16px 16px 0 0;
     }
 
-    .tab {
-      padding: 10px 20px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 10px 10px 0 0;
+    .overlay-header h2 {
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .overlay-close {
+      background: none;
+      border: none;
       color: #888;
+      font-size: 1.5rem;
       cursor: pointer;
-      font-size: 0.85rem;
-      transition: all 0.2s;
-      flex-shrink: 0;
+      padding: 4px 8px;
     }
 
-    .tab:hover { color: #ccc; background: rgba(255,255,255,0.06); }
-    .tab.active {
-      color: #00d4ff;
-      background: rgba(0,212,255,0.08);
-      border-color: rgba(0,212,255,0.3);
-      border-bottom-color: transparent;
-    }
+    .overlay-close:hover { color: #fff; }
 
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 350px;
-      gap: 20px;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
+    .overlay-content { padding: 20px 24px; }
 
-    @media (max-width: 900px) {
-      .main-grid { grid-template-columns: 1fr; }
-    }
-
-    @media (min-width: 601px) and (max-width: 900px) {
-      .chat-overlay { width: 380px !important; }
-      .sidebar { display: grid; grid-template-columns: 1fr 1fr; }
-    }
-
-    @media (max-width: 600px) {
-      .tabs { gap: 2px; }
-      .tab { padding: 8px 14px; font-size: 0.8rem; }
-      body { padding: 10px; }
-      .chat-overlay { width: 100% !important; }
-    }
-
+    /* ── Cards ── */
     .section-title {
       font-size: 0.9rem;
       font-weight: 600;
@@ -222,91 +316,7 @@
     .token-bar-fill.medium { background: #ffcc00; }
     .token-bar-fill.high { background: #ff4757; }
 
-    .sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .panel {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px;
-      padding: 20px;
-    }
-
-    .quick-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .action-btn {
-      background: rgba(0, 212, 255, 0.1);
-      border: 1px solid rgba(0, 212, 255, 0.3);
-      color: #00d4ff;
-      padding: 12px 16px;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .action-btn:hover {
-      background: rgba(0, 212, 255, 0.2);
-      border-color: #00d4ff;
-    }
-
-    .action-btn.secondary {
-      background: rgba(255,255,255,0.05);
-      border-color: rgba(255,255,255,0.1);
-      color: #aaa;
-    }
-
-    .action-btn.secondary:hover {
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-    }
-
-    .action-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .channel-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      font-size: 0.85rem;
-    }
-
-    .channel-row:last-child { border-bottom: none; }
-
-    .cron-mini {
-      list-style: none;
-      max-height: 250px;
-      overflow-y: auto;
-    }
-
-    .cron-mini li {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      font-size: 0.8rem;
-    }
-
-    .cron-mini li:last-child { border-bottom: none; }
-
-    .cron-name { color: #e0e0e0; }
-    .cron-next { color: #666; font-size: 0.75rem; }
-
+    /* ── Filter Pills ── */
     .filter-pill {
       padding: 5px 14px;
       border-radius: 20px;
@@ -333,6 +343,7 @@
 
     .session-group-title:first-child { margin-top: 0; }
 
+    /* ── Cron ── */
     .cron-run-btn {
       background: rgba(0,212,255,0.15);
       border: 1px solid rgba(0,212,255,0.3);
@@ -348,7 +359,234 @@
     .cron-run-btn:hover { background: rgba(0,212,255,0.3); }
     .cron-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Chat Panel */
+    .cron-toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.15);
+      cursor: pointer;
+      border: none;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .cron-toggle.on { background: rgba(0,255,136,0.4); }
+
+    .cron-toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+    }
+
+    .cron-toggle.on .cron-toggle-knob { transform: translateX(16px); }
+
+    .payload-preview {
+      background: rgba(0,0,0,0.25);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 8px;
+      max-height: 60px;
+      overflow: hidden;
+      line-height: 1.4;
+      position: relative;
+      cursor: pointer;
+      transition: max-height 0.3s;
+    }
+
+    .payload-preview.expanded {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .payload-preview::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 20px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.4));
+      pointer-events: none;
+    }
+
+    .payload-preview.expanded::after { display: none; }
+
+    .cron-history {
+      margin-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      padding-top: 10px;
+    }
+
+    .cron-history-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 0.75rem;
+      color: #888;
+    }
+
+    .cron-history-row + .cron-history-row {
+      border-top: 1px solid rgba(255,255,255,0.03);
+    }
+
+    /* ── Channel Rows ── */
+    .channel-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.85rem;
+    }
+
+    .channel-row:last-child { border-bottom: none; }
+
+    /* ── Logs ── */
+    .log-entry {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      line-height: 1.4;
+    }
+
+    .log-entry.log-error { color: #ff6b6b; }
+    .log-entry.log-warn { color: #ffdd57; }
+    .log-entry.log-info { color: #aaa; }
+    .log-entry .log-ts { color: #555; margin-right: 8px; }
+    .log-entry .log-level { font-weight: 600; margin-right: 8px; min-width: 50px; display: inline-block; }
+
+    /* ── Health Banner ── */
+    .health-banner {
+      display: none;
+      margin-bottom: 16px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      border: 1px solid rgba(255,71,87,0.3);
+      background: rgba(255,71,87,0.08);
+      color: #ff8a8a;
+    }
+
+    .health-banner.warn {
+      display: block;
+      border-color: rgba(255,204,0,0.3);
+      background: rgba(255,204,0,0.08);
+      color: #ffdd57;
+    }
+
+    .health-banner.critical {
+      display: block;
+      border-color: rgba(255,71,87,0.4);
+      background: rgba(255,71,87,0.1);
+      color: #ff6b6b;
+    }
+
+    .health-banner-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+
+    .health-banner-item + .health-banner-item {
+      border-top: 1px solid rgba(255,255,255,0.05);
+      margin-top: 4px;
+      padding-top: 8px;
+    }
+
+    /* ── Action Buttons ── */
+    .action-btn {
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      color: #00d4ff;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .action-btn:hover {
+      background: rgba(0, 212, 255, 0.2);
+      border-color: #00d4ff;
+    }
+
+    .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Refresh Bar (HUD) ── */
+    .refresh-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.65rem;
+      color: #555;
+      background: rgba(0,0,0,0.5);
+      padding: 3px 8px;
+      border-radius: 4px;
+      transition: color 0.3s;
+    }
+
+    .refresh-bar.stale { color: #ff4757; }
+    .refresh-bar.fetching { color: #00d4ff; }
+
+    .refresh-spinner {
+      width: 8px;
+      height: 8px;
+      border: 1.5px solid rgba(0,212,255,0.3);
+      border-top-color: #00d4ff;
+      border-radius: 50%;
+      display: none;
+    }
+
+    .refresh-bar.fetching .refresh-spinner {
+      display: inline-block;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* ── Error State ── */
+    .error-state {
+      text-align: center;
+      padding: 30px 20px;
+      color: #888;
+    }
+
+    .error-state p { margin-bottom: 12px; }
+
+    .retry-btn {
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #00d4ff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+
+    .retry-btn:hover { background: rgba(0,212,255,0.2); }
+
+    /* ── Panel (used in log overlay) ── */
+    .panel {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    /* ── Chat Panel ── */
     .chat-overlay {
       display: none;
       position: fixed;
@@ -539,6 +777,7 @@
       40% { transform: translateY(-6px); }
     }
 
+    /* ── Modal ── */
     .modal {
       display: none;
       position: fixed;
@@ -572,9 +811,7 @@
       margin-bottom: 20px;
     }
 
-    .modal-header h2 {
-      font-size: 1.2rem;
-    }
+    .modal-header h2 { font-size: 1.2rem; }
 
     .modal-close {
       background: none;
@@ -616,6 +853,26 @@
       border-color: rgba(0,212,255,0.5);
     }
 
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1a1a2e;
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #e0e0e0;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      z-index: 2000;
+      transition: transform 0.3s ease;
+    }
+
+    .toast.visible { transform: translateX(-50%) translateY(0); }
+    .toast.error { border-color: rgba(255,71,87,0.5); color: #ff4757; }
+
+    /* ── Animations ── */
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
@@ -635,339 +892,167 @@
       100% { background-position: -200% 0; }
     }
 
-    .hidden { display: none !important; }
-
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%) translateY(100px);
-      background: #1a1a2e;
-      border: 1px solid rgba(0,212,255,0.3);
-      color: #e0e0e0;
-      padding: 12px 24px;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      z-index: 2000;
-      transition: transform 0.3s ease;
-    }
-
-    .toast.visible { transform: translateX(-50%) translateY(0); }
-    .toast.error { border-color: rgba(255,71,87,0.5); color: #ff4757; }
-
-    /* Health Banner */
-    .health-banner {
-      display: none;
-      max-width: 1400px;
-      margin: 0 auto 16px auto;
-      padding: 12px 20px;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      border: 1px solid rgba(255,71,87,0.3);
-      background: rgba(255,71,87,0.08);
-      color: #ff8a8a;
-    }
-
-    .health-banner.warn {
-      display: block;
-      border-color: rgba(255,204,0,0.3);
-      background: rgba(255,204,0,0.08);
-      color: #ffdd57;
-    }
-
-    .health-banner.critical {
-      display: block;
-      border-color: rgba(255,71,87,0.4);
-      background: rgba(255,71,87,0.1);
-      color: #ff6b6b;
-    }
-
-    .health-banner-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 4px 0;
-    }
-
-    .health-banner-item + .health-banner-item {
-      border-top: 1px solid rgba(255,255,255,0.05);
-      margin-top: 4px;
-      padding-top: 8px;
-    }
-
-    /* Cron toggle */
-    .cron-toggle {
-      position: relative;
-      width: 36px;
-      height: 20px;
-      border-radius: 10px;
-      background: rgba(255,255,255,0.15);
-      cursor: pointer;
-      border: none;
-      transition: background 0.3s;
-      flex-shrink: 0;
-    }
-
-    .cron-toggle.on { background: rgba(0,255,136,0.4); }
-
-    .cron-toggle-knob {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #fff;
-      transition: transform 0.2s;
-    }
-
-    .cron-toggle.on .cron-toggle-knob { transform: translateX(16px); }
-
-    /* Payload preview */
-    .payload-preview {
-      background: rgba(0,0,0,0.25);
-      border-radius: 6px;
-      padding: 8px 10px;
-      font-size: 0.75rem;
-      color: #888;
-      margin-top: 8px;
-      max-height: 60px;
-      overflow: hidden;
-      line-height: 1.4;
-      position: relative;
-      cursor: pointer;
-      transition: max-height 0.3s;
-    }
-
-    .payload-preview.expanded {
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .payload-preview::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 20px;
-      background: linear-gradient(transparent, rgba(0,0,0,0.4));
-      pointer-events: none;
-    }
-
-    .payload-preview.expanded::after { display: none; }
-
-    /* Refresh indicator */
-    .refresh-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.7rem;
-      color: #555;
-      justify-content: center;
-      margin-top: 12px;
-      transition: color 0.3s;
-    }
-
-    .refresh-bar.stale { color: #ff4757; }
-    .refresh-bar.fetching { color: #00d4ff; }
-
-    .refresh-spinner {
-      width: 10px;
-      height: 10px;
-      border: 2px solid rgba(0,212,255,0.3);
-      border-top-color: #00d4ff;
-      border-radius: 50%;
-      display: none;
-    }
-
-    .refresh-bar.fetching .refresh-spinner {
-      display: inline-block;
-      animation: spin 0.8s linear infinite;
-    }
-
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
 
-    /* Error state */
-    .error-state {
-      text-align: center;
-      padding: 30px 20px;
-      color: #888;
+    .hidden { display: none !important; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .chat-overlay { width: 100% !important; }
+      .overlay-content { padding: 12px 14px; }
+      .cards-grid { grid-template-columns: 1fr; }
     }
 
-    .error-state p { margin-bottom: 12px; }
-
-    .retry-btn {
-      background: rgba(0,212,255,0.1);
-      border: 1px solid rgba(0,212,255,0.3);
-      color: #00d4ff;
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      transition: all 0.2s;
+    @media (min-width: 601px) and (max-width: 900px) {
+      .chat-overlay { width: 380px !important; }
     }
-
-    .retry-btn:hover { background: rgba(0,212,255,0.2); }
-
-    /* Cron run history */
-    .cron-history {
-      margin-top: 10px;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      padding-top: 10px;
-    }
-
-    .cron-history-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 4px 0;
-      font-size: 0.75rem;
-      color: #888;
-    }
-
-    .cron-history-row + .cron-history-row {
-      border-top: 1px solid rgba(255,255,255,0.03);
-    }
-
-    /* Log entries */
-    .log-entry {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.78rem;
-      padding: 6px 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-      line-height: 1.4;
-    }
-
-    .log-entry.log-error { color: #ff6b6b; }
-    .log-entry.log-warn { color: #ffdd57; }
-    .log-entry.log-info { color: #aaa; }
-    .log-entry .log-ts { color: #555; margin-right: 8px; }
-    .log-entry .log-level { font-weight: 600; margin-right: 8px; min-width: 50px; display: inline-block; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>BEDDAN COMMAND CENTER</h1>
-    <div class="subtitle">OpenClaw Gateway Control <span id="sessionCount">-</span> Sessions <span id="cronCount">-</span> Cron Jobs</div>
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-top-left">
+      <div class="hud-status-item">
+        <div class="status-dot" id="gwDot"></div>
+        <span id="gwStatus">Connecting...</span>
+      </div>
+      <div class="hud-status-item">
+        <div class="status-dot" id="tgDot"></div>
+        <span id="tgStatus">Telegram: ...</span>
+      </div>
+      <div class="hud-status-item">
+        <div class="status-dot" id="waDot"></div>
+        <span id="waStatus">WhatsApp: ...</span>
+      </div>
+    </div>
+
+    <div class="hud-top-right">
+      <div class="hud-info" id="modelInfo">Model: ...</div>
+      <div class="hud-info"><span id="sessionCount">-</span> Sessions &middot; <span id="cronCount">-</span> Cron</div>
+    </div>
+
+    <div class="hud-bottom-center">
+      <div class="interact-prompt" id="interactPrompt"></div>
+    </div>
+
+    <div class="hud-bottom-left">
+      <div class="refresh-bar" id="refreshBar">
+        <div class="refresh-spinner"></div>
+        <span id="refreshText">Loading...</span>
+      </div>
+      <div class="hud-hints">WASD: Move &middot; E: Interact &middot; M: Message &middot; Esc: Close</div>
+    </div>
+
+    <div class="hud-bottom-right">
+      <canvas id="minimapCanvas" width="180" height="120"></canvas>
+    </div>
   </div>
 
-  <div class="status-bar">
-    <div class="status-item">
-      <div class="status-dot" id="gwDot"></div>
-      <span id="gwStatus">Connecting...</span>
-    </div>
-    <div class="status-item">
-      <div class="status-dot" id="tgDot"></div>
-      <span id="tgStatus">Telegram: ...</span>
-    </div>
-    <div class="status-item">
-      <div class="status-dot" id="waDot"></div>
-      <span id="waStatus">WhatsApp: ...</span>
-    </div>
-    <div class="status-item">
-      <div class="status-dot blue"></div>
-      <span id="modelInfo">Model: ...</span>
-    </div>
-  </div>
-
-  <div class="health-banner" id="healthBanner"></div>
-
-  <div class="tabs">
-    <div class="tab active" data-tab="sessions">Sessions</div>
-    <div class="tab" data-tab="cron">Cron Jobs</div>
-    <div class="tab" data-tab="agents">Agents</div>
-    <div class="tab" data-tab="skills">Skills</div>
-    <div class="tab" data-tab="logs">Logs</div>
-  </div>
-
-  <div class="main-grid">
-    <div class="content-area">
-      <div id="tab-sessions">
+  <!-- Station Overlays -->
+  <div class="station-overlay" id="overlay-sessions">
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>&#x1F4E1; Session Terminals</h2>
+        <button class="overlay-close" onclick="closeOverlay()">&times;</button>
+      </div>
+      <div class="overlay-content">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
           <div class="section-title" style="margin-bottom:0">Sessions</div>
           <div id="sessionFilters" style="display:flex;gap:6px;flex-wrap:wrap"></div>
         </div>
-        <div id="sessionsGrid">
-          <div class="cards-grid">
-            <div class="card skeleton" style="height:140px"></div>
-            <div class="card skeleton" style="height:140px"></div>
-            <div class="card skeleton" style="height:140px"></div>
-          </div>
-        </div>
+        <div id="sessionsGrid"></div>
       </div>
+    </div>
+  </div>
 
-      <div id="tab-cron" class="hidden">
-        <div class="section-title">Scheduled Jobs</div>
+  <div class="station-overlay" id="overlay-cron">
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>&#x23F0; Cron Scheduler</h2>
+        <button class="overlay-close" onclick="closeOverlay()">&times;</button>
+      </div>
+      <div class="overlay-content">
         <div class="cards-grid" id="cronGrid"></div>
       </div>
+    </div>
+  </div>
 
-      <div id="tab-agents" class="hidden">
-        <div class="section-title">Agents</div>
+  <div class="station-overlay" id="overlay-agents">
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>&#x1F916; Agent Bay</h2>
+        <button class="overlay-close" onclick="closeOverlay()">&times;</button>
+      </div>
+      <div class="overlay-content">
         <div class="cards-grid" id="agentsGrid">
           <div class="card skeleton" style="height:120px"></div>
           <div class="card skeleton" style="height:120px"></div>
         </div>
       </div>
+    </div>
+  </div>
 
-      <div id="tab-skills" class="hidden">
-        <div class="section-title">Skills</div>
+  <div class="station-overlay" id="overlay-skills">
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>&#x1F9E9; Skills Library</h2>
+        <button class="overlay-close" onclick="closeOverlay()">&times;</button>
+      </div>
+      <div class="overlay-content">
         <div class="cards-grid" id="skillsGrid">
           <div class="card skeleton" style="height:100px"></div>
           <div class="card skeleton" style="height:100px"></div>
         </div>
       </div>
+    </div>
+  </div>
 
-      <div id="tab-logs" class="hidden">
-        <div class="section-title">Gateway Logs</div>
+  <div class="station-overlay" id="overlay-logs">
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>&#x1F4CB; Log Console</h2>
+        <button class="overlay-close" onclick="closeOverlay()">&times;</button>
+      </div>
+      <div class="overlay-content">
         <div id="logsContainer">
           <div class="card skeleton" style="height:300px"></div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="sidebar">
-      <div class="panel">
-        <div class="section-title">Quick Actions</div>
-        <div class="quick-actions">
-          <button class="action-btn" onclick="openSpawnModal()">
-            <span>+</span> Send Agent Message
-          </button>
-          <button class="action-btn secondary" onclick="refreshAll()">
-            Refresh All
-          </button>
-        </div>
+  <div class="station-overlay" id="overlay-gateway">
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>&#x1F310; Gateway Core</h2>
+        <button class="overlay-close" onclick="closeOverlay()">&times;</button>
       </div>
-
-      <div class="panel">
-        <div class="section-title">Channels</div>
-        <div id="channelsList">
-          <div class="channel-row"><span>Loading...</span></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="section-title">Upcoming Cron</div>
-        <ul class="cron-mini" id="cronMiniList">
-          <li><span class="cron-name">Loading...</span></li>
-        </ul>
-      </div>
-
-      <div class="panel">
-        <div class="section-title">Gateway Info</div>
-        <div id="gatewayInfo" style="font-size:0.8rem;color:#888;">Loading...</div>
+      <div class="overlay-content">
+        <div class="health-banner" id="healthBanner"></div>
+        <div id="gatewayInfo" style="font-size:0.85rem;color:#aaa;">Loading...</div>
       </div>
     </div>
   </div>
 
-  <div class="refresh-bar" id="refreshBar">
-    <div class="refresh-spinner"></div>
-    <span id="refreshText">Loading...</span>
+  <div class="station-overlay" id="overlay-comms">
+    <div class="overlay-panel">
+      <div class="overlay-header">
+        <h2>&#x1F4E8; Comms Hub</h2>
+        <button class="overlay-close" onclick="closeOverlay()">&times;</button>
+      </div>
+      <div class="overlay-content">
+        <div id="channelsList">
+          <div class="channel-row"><span>Loading...</span></div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Chat Panel (slide-in from right) -->
+  <!-- Chat Panel -->
   <div class="chat-overlay" id="chatPanel">
     <div class="chat-header">
       <h3 id="chatTitle">Session Chat</h3>
@@ -1018,7 +1103,9 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    // ── State ──
+    // ═══════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════
     var statusData = null;
     var healthData = null;
     var cronData = null;
@@ -1031,16 +1118,164 @@
     var lastCronRefreshAt = 0;
     var isFetching = false;
     var currentThinkingLevel = 'off';
-
-    // Track which tabs have been loaded
-    var tabLoaded = { sessions: true, cron: true, agents: false, skills: false, logs: false };
-    // Track expanded cron history
     var expandedCronHistory = {};
+    var activeFilter = 'active';
+    var activeOverlay = null;
+    var stationLoaded = { sessions: true, cron: true, agents: false, skills: false, logs: false, gateway: true, comms: true };
 
-    // All tab IDs
-    var ALL_TABS = ['sessions', 'cron', 'agents', 'skills', 'logs'];
+    // ═══════════════════════════════════════════
+    // GAME CONSTANTS
+    // ═══════════════════════════════════════════
+    var WORLD_W = 2400;
+    var WORLD_H = 1600;
+    var WALL_T = 24;
+    var GRID_SIZE = 64;
+    var PLAYER_SPEED = 220;
+    var PLAYER_SIZE = 28;
+    var PARTICLE_COUNT = 40;
+    var CAMERA_SMOOTH = 0.08;
+    var TICK_RATE = 1000 / 60;
 
-    // ── localStorage chat history ──
+    // ═══════════════════════════════════════════
+    // STATION DEFINITIONS
+    // ═══════════════════════════════════════════
+    var stations = [
+      {
+        id: 'comms', label: 'Comms Hub', emoji: '\u{1F4E8}',
+        cx: 1200, cy: 190, w: 260, h: 110,
+        interactRadius: 100, overlayId: 'overlay-comms',
+        colorPrimary: '#00b894', colorSecondary: '#00cec9',
+        getStatusColor: function() {
+          if (!healthData || !healthData.channels) return '#ffcc00';
+          return '#00ff88';
+        },
+        getSubInfo: function() {
+          if (!healthData || !healthData.channels) return 'Loading...';
+          return Object.keys(healthData.channels).length + ' channels';
+        }
+      },
+      {
+        id: 'sessions', label: 'Session Terminals', emoji: '\u{1F4E1}',
+        cx: 370, cy: 500, w: 260, h: 140,
+        interactRadius: 100, overlayId: 'overlay-sessions',
+        colorPrimary: '#6c5ce7', colorSecondary: '#a29bfe',
+        getStatusColor: function() {
+          if (!sessionsData) return '#ffcc00';
+          return sessionsData.count > 0 ? '#00ff88' : '#ffcc00';
+        },
+        getSubInfo: function() {
+          return sessionsData ? (sessionsData.count || 0) + ' sessions' : 'Loading...';
+        }
+      },
+      {
+        id: 'gateway', label: 'Gateway Core', emoji: '\u{1F310}',
+        cx: 1200, cy: 700, w: 280, h: 170,
+        interactRadius: 110, overlayId: 'overlay-gateway',
+        colorPrimary: '#00d4ff', colorSecondary: '#0984e3',
+        getStatusColor: function() {
+          if (!statusData || !statusData.gateway) return '#ffcc00';
+          return statusData.gateway.reachable ? '#00ff88' : '#ff4757';
+        },
+        getSubInfo: function() {
+          if (!statusData || !statusData.gateway) return 'Loading...';
+          return statusData.gateway.reachable ? statusData.gateway.connectLatencyMs + 'ms' : 'Unreachable';
+        }
+      },
+      {
+        id: 'cron', label: 'Cron Scheduler', emoji: '\u23F0',
+        cx: 2030, cy: 500, w: 260, h: 140,
+        interactRadius: 100, overlayId: 'overlay-cron',
+        colorPrimary: '#e17055', colorSecondary: '#fdcb6e',
+        getStatusColor: function() {
+          if (!cronData || !cronData.jobs) return '#ffcc00';
+          var hasErrors = cronData.jobs.some(function(j) { return j.state && j.state.consecutiveErrors > 0; });
+          return hasErrors ? '#ffcc00' : '#00ff88';
+        },
+        getSubInfo: function() {
+          return cronData ? (cronData.jobs ? cronData.jobs.length : 0) + ' jobs' : 'Loading...';
+        }
+      },
+      {
+        id: 'agents', label: 'Agent Bay', emoji: '\u{1F916}',
+        cx: 370, cy: 1100, w: 260, h: 140,
+        interactRadius: 100, overlayId: 'overlay-agents',
+        colorPrimary: '#0984e3', colorSecondary: '#74b9ff',
+        getStatusColor: function() {
+          if (!agentsData) return '#ffcc00';
+          return '#00ff88';
+        },
+        getSubInfo: function() {
+          if (!agentsData) return 'Not loaded';
+          var agents = agentsData.agents || agentsData;
+          var count = Array.isArray(agents) ? agents.length : Object.keys(agents).length;
+          return count + ' agents';
+        }
+      },
+      {
+        id: 'logs', label: 'Log Console', emoji: '\u{1F4CB}',
+        cx: 1200, cy: 1300, w: 260, h: 110,
+        interactRadius: 100, overlayId: 'overlay-logs',
+        colorPrimary: '#636e72', colorSecondary: '#b2bec3',
+        getStatusColor: function() {
+          if (!logsData) return '#ffcc00';
+          return '#00ff88';
+        },
+        getSubInfo: function() {
+          if (!logsData) return 'Not loaded';
+          var entries = logsData.entries || logsData.logs || logsData;
+          return (Array.isArray(entries) ? entries.length : 0) + ' entries';
+        }
+      },
+      {
+        id: 'skills', label: 'Skills Library', emoji: '\u{1F9E9}',
+        cx: 2030, cy: 1100, w: 260, h: 140,
+        interactRadius: 100, overlayId: 'overlay-skills',
+        colorPrimary: '#00b894', colorSecondary: '#55efc4',
+        getStatusColor: function() {
+          if (!skillsData) return '#ffcc00';
+          return '#00ff88';
+        },
+        getSubInfo: function() {
+          if (!skillsData) return 'Not loaded';
+          var skills = skillsData.skills || skillsData;
+          var count = Array.isArray(skills) ? skills.length : Object.keys(skills).length;
+          return count + ' skills';
+        }
+      }
+    ];
+
+    // Compute bounding boxes from center coords
+    stations.forEach(function(s) {
+      s.x = s.cx - s.w / 2;
+      s.y = s.cy - s.h / 2;
+    });
+
+    // ═══════════════════════════════════════════
+    // GAME STATE
+    // ═══════════════════════════════════════════
+    var player = {
+      x: 1200, y: 920,
+      prevX: 1200, prevY: 920,
+      moving: false, dir: 0
+    };
+
+    var camera = { x: 0, y: 0 };
+    var keysDown = {};
+    var nearestStation = null;
+    var animTimer = 0;
+    var particles = [];
+    var lastTime = 0;
+    var accumulator = 0;
+
+    // Pre-rendered floor
+    var floorCanvas = document.createElement('canvas');
+    floorCanvas.width = WORLD_W;
+    floorCanvas.height = WORLD_H;
+    var floorCtx = floorCanvas.getContext('2d');
+
+    // ═══════════════════════════════════════════
+    // localStorage CHAT HISTORY
+    // ═══════════════════════════════════════════
     function getChatHistory(sessionId) {
       try {
         var data = localStorage.getItem('chat:' + sessionId);
@@ -1061,7 +1296,9 @@
       saveChatHistory(sessionId, history);
     }
 
-    // ── API ──
+    // ═══════════════════════════════════════════
+    // API + TOAST
+    // ═══════════════════════════════════════════
     async function api(path, opts) {
       opts = opts || {};
       var res = await fetch(path, opts);
@@ -1078,120 +1315,17 @@
       setTimeout(function() { el.classList.remove('visible'); }, 3000);
     }
 
-    // ── Reusable UI helpers ──
-    function buildErrorState(message, retryFn) {
-      return h('div', { className: 'error-state' }, [
-        h('p', {}, message),
-        h('button', { className: 'retry-btn', onclick: retryFn }, 'Retry')
-      ]);
-    }
-
-    function buildSkeletonCards(count, height) {
-      var cards = [];
-      for (var i = 0; i < count; i++) {
-        cards.push(h('div', { className: 'card skeleton', style: { height: (height || 120) + 'px' } }));
-      }
-      return h('div', { className: 'cards-grid' }, cards);
-    }
-
-    // ── Data Fetching ──
-    async function fetchStatus() {
-      try {
-        statusData = await api('/api/status');
-        renderStatusBar();
-        renderGatewayInfo();
-      } catch (e) {
-        setText('gwStatus', 'Offline');
-        setClass('gwDot', 'status-dot red');
-      }
-    }
-
-    async function fetchHealth() {
-      try {
-        healthData = await api('/api/health');
-        renderChannels();
-      } catch (e) {
-        console.error('Health fetch failed:', e);
-      }
-    }
-
-    async function fetchCron() {
-      try {
-        cronData = await api('/api/cron');
-        lastCronRefreshAt = Date.now();
-        renderCronGrid();
-        renderCronMini();
-        setText('cronCount', String(cronData.jobs ? cronData.jobs.length : 0));
-      } catch (e) {
-        var grid = document.getElementById('cronGrid');
-        clearChildren(grid);
-        grid.appendChild(buildErrorState('Failed to load cron jobs', fetchCron));
-      }
-    }
-
-    async function fetchSessions() {
-      try {
-        sessionsData = await api('/api/sessions');
-        renderSessionsGrid();
-        setText('sessionCount', String(sessionsData.count || 0));
-      } catch (e) {
-        var container = document.getElementById('sessionsGrid');
-        clearChildren(container);
-        container.appendChild(buildErrorState('Failed to load sessions', fetchSessions));
-      }
-    }
-
-    async function fetchAgents() {
-      try {
-        agentsData = await api('/api/agents');
-        renderAgentsGrid();
-      } catch (e) {
-        var grid = document.getElementById('agentsGrid');
-        clearChildren(grid);
-        grid.appendChild(buildErrorState('Failed to load agents', fetchAgents));
-      }
-    }
-
-    async function fetchSkills() {
-      try {
-        skillsData = await api('/api/skills');
-        renderSkillsGrid();
-      } catch (e) {
-        var grid = document.getElementById('skillsGrid');
-        clearChildren(grid);
-        grid.appendChild(buildErrorState('Failed to load skills', fetchSkills));
-      }
-    }
-
-    async function fetchLogs() {
-      try {
-        logsData = await api('/api/logs');
-        renderLogs();
-      } catch (e) {
-        var container = document.getElementById('logsContainer');
-        clearChildren(container);
-        container.appendChild(buildErrorState('Failed to load logs', fetchLogs));
-      }
-    }
-
-    async function refreshAll(silent) {
-      isFetching = true;
-      updateRefreshBar();
-      await Promise.all([fetchStatus(), fetchHealth(), fetchCron(), fetchSessions()]);
-      lastRefreshAt = Date.now();
-      isFetching = false;
-      updateRefreshBar();
-      renderHealthBanner();
-      if (!silent) toast('Refreshed');
-    }
-
-    // ── DOM helpers ──
+    // ═══════════════════════════════════════════
+    // DOM HELPERS
+    // ═══════════════════════════════════════════
     function setText(id, text) {
-      document.getElementById(id).textContent = text;
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
     }
 
     function setClass(id, cls) {
-      document.getElementById(id).className = cls;
+      var el = document.getElementById(id);
+      if (el) el.className = cls;
     }
 
     function clearChildren(el) {
@@ -1223,7 +1357,118 @@
       return el;
     }
 
-    // ── Status Bar ──
+    function buildErrorState(message, retryFn) {
+      return h('div', { className: 'error-state' }, [
+        h('p', {}, message),
+        h('button', { className: 'retry-btn', onclick: retryFn }, 'Retry')
+      ]);
+    }
+
+    // ═══════════════════════════════════════════
+    // DATA FETCHING
+    // ═══════════════════════════════════════════
+    async function fetchStatus() {
+      try {
+        statusData = await api('/api/status');
+        renderStatusBar();
+        renderGatewayInfo();
+      } catch (e) {
+        setText('gwStatus', 'Offline');
+        setClass('gwDot', 'status-dot red');
+      }
+    }
+
+    async function fetchHealth() {
+      try {
+        healthData = await api('/api/health');
+        renderChannels();
+      } catch (e) {
+        console.error('Health fetch failed:', e);
+      }
+    }
+
+    async function fetchCron() {
+      try {
+        cronData = await api('/api/cron');
+        lastCronRefreshAt = Date.now();
+        renderCronGrid();
+        setText('cronCount', String(cronData.jobs ? cronData.jobs.length : 0));
+      } catch (e) {
+        var grid = document.getElementById('cronGrid');
+        if (grid) {
+          clearChildren(grid);
+          grid.appendChild(buildErrorState('Failed to load cron jobs', fetchCron));
+        }
+      }
+    }
+
+    async function fetchSessions() {
+      try {
+        sessionsData = await api('/api/sessions');
+        renderSessionsGrid();
+        setText('sessionCount', String(sessionsData.count || 0));
+      } catch (e) {
+        var container = document.getElementById('sessionsGrid');
+        if (container) {
+          clearChildren(container);
+          container.appendChild(buildErrorState('Failed to load sessions', fetchSessions));
+        }
+      }
+    }
+
+    async function fetchAgents() {
+      try {
+        agentsData = await api('/api/agents');
+        renderAgentsGrid();
+      } catch (e) {
+        var grid = document.getElementById('agentsGrid');
+        if (grid) {
+          clearChildren(grid);
+          grid.appendChild(buildErrorState('Failed to load agents', fetchAgents));
+        }
+      }
+    }
+
+    async function fetchSkills() {
+      try {
+        skillsData = await api('/api/skills');
+        renderSkillsGrid();
+      } catch (e) {
+        var grid = document.getElementById('skillsGrid');
+        if (grid) {
+          clearChildren(grid);
+          grid.appendChild(buildErrorState('Failed to load skills', fetchSkills));
+        }
+      }
+    }
+
+    async function fetchLogs() {
+      try {
+        logsData = await api('/api/logs');
+        renderLogs();
+      } catch (e) {
+        var container = document.getElementById('logsContainer');
+        if (container) {
+          clearChildren(container);
+          container.appendChild(buildErrorState('Failed to load logs', fetchLogs));
+        }
+      }
+    }
+
+    async function refreshAll(silent) {
+      isFetching = true;
+      updateRefreshBar();
+      await Promise.all([fetchStatus(), fetchHealth(), fetchCron(), fetchSessions()]);
+      lastRefreshAt = Date.now();
+      isFetching = false;
+      updateRefreshBar();
+      renderHealthBanner();
+      if (!silent) toast('Refreshed');
+    }
+
+    // ═══════════════════════════════════════════
+    // STATUS BAR (targets HUD elements)
+    // ═══════════════════════════════════════════
     function renderStatusBar() {
       var gw = statusData && statusData.gateway;
       if (gw && gw.reachable) {
@@ -1237,10 +1482,13 @@
       setText('modelInfo', 'Model: ' + model);
     }
 
-    // ── Channels ──
+    // ═══════════════════════════════════════════
+    // CHANNELS (targets comms overlay + HUD)
+    // ═══════════════════════════════════════════
     function renderChannels() {
       if (!healthData || !healthData.channels) return;
       var container = document.getElementById('channelsList');
+      if (!container) return;
       clearChildren(container);
       var channels = healthData.channels;
       var order = healthData.channelOrder || Object.keys(channels);
@@ -1280,9 +1528,9 @@
       });
     }
 
-    // ── Session classification ──
-    var activeFilter = 'active';
-
+    // ═══════════════════════════════════════════
+    // SESSION CLASSIFICATION + FILTERS
+    // ═══════════════════════════════════════════
     function classifySession(s) {
       var key = s.key;
       if (key.endsWith(':main')) return 'main';
@@ -1348,6 +1596,7 @@
 
     function renderSessionFilters(sessions) {
       var filters = document.getElementById('sessionFilters');
+      if (!filters) return;
       clearChildren(filters);
 
       var counts = { active: 0, all: sessions.length, main: 0, cron: 0, telegram: 0, api: 0 };
@@ -1375,9 +1624,12 @@
       });
     }
 
-    // ── Sessions Grid ──
+    // ═══════════════════════════════════════════
+    // SESSIONS GRID
+    // ═══════════════════════════════════════════
     function renderSessionsGrid() {
       var container = document.getElementById('sessionsGrid');
+      if (!container) return;
       clearChildren(container);
 
       if (!sessionsData || !sessionsData.sessions || !sessionsData.sessions.length) {
@@ -1454,9 +1706,12 @@
       ]);
     }
 
-    // ── Cron Grid ──
+    // ═══════════════════════════════════════════
+    // CRON GRID
+    // ═══════════════════════════════════════════
     function renderCronGrid() {
       var grid = document.getElementById('cronGrid');
+      if (!grid) return;
       clearChildren(grid);
 
       if (!cronData || !cronData.jobs || !cronData.jobs.length) {
@@ -1540,18 +1795,18 @@
 
         if (payloadEl) cardChildren.push(payloadEl);
 
-        // History container
         var historyContainer = h('div', { className: 'cron-history hidden', id: 'cron-history-' + job.id });
         cardChildren.push(h('div', { style: { marginTop: '10px', display: 'flex', gap: '8px' } }, [runBtn, historyBtn, deleteBtn]));
         cardChildren.push(historyContainer);
 
         var card = h('div', { className: 'card', style: { cursor: 'default', opacity: job.enabled ? '1' : '0.5' } }, cardChildren);
-
         grid.appendChild(card);
       });
     }
 
-    // ── Cron Run History ──
+    // ═══════════════════════════════════════════
+    // CRON HISTORY
+    // ═══════════════════════════════════════════
     async function toggleCronHistory(jobId, btn) {
       var container = document.getElementById('cron-history-' + jobId);
       if (!container) return;
@@ -1596,9 +1851,12 @@
       btn.disabled = false;
     }
 
-    // ── Agents Grid ──
+    // ═══════════════════════════════════════════
+    // AGENTS GRID
+    // ═══════════════════════════════════════════
     function renderAgentsGrid() {
       var grid = document.getElementById('agentsGrid');
+      if (!grid) return;
       clearChildren(grid);
 
       var agents = agentsData && (agentsData.agents || agentsData);
@@ -1622,7 +1880,6 @@
         var status = agent.status || 'configured';
         var statusDot = status === 'active' || status === 'running' ? 'green' : status === 'error' ? 'red' : 'yellow';
 
-        // Count sessions for this agent
         var sessionCount = 0;
         if (sessionsData && sessionsData.sessions) {
           sessionsData.sessions.forEach(function(s) {
@@ -1631,8 +1888,9 @@
         }
 
         var card = h('div', { className: 'card', onclick: function() {
+          closeOverlay();
           activeFilter = 'all';
-          switchTab('sessions');
+          openOverlay('sessions');
           renderSessionsGrid();
         } }, [
           h('div', { className: 'card-header' }, [
@@ -1651,9 +1909,12 @@
       });
     }
 
-    // ── Skills Grid ──
+    // ═══════════════════════════════════════════
+    // SKILLS GRID
+    // ═══════════════════════════════════════════
     function renderSkillsGrid() {
       var grid = document.getElementById('skillsGrid');
+      if (!grid) return;
       clearChildren(grid);
 
       var skills = skillsData && (skillsData.skills || skillsData);
@@ -1694,9 +1955,12 @@
       });
     }
 
-    // ── Logs ──
+    // ═══════════════════════════════════════════
+    // LOGS
+    // ═══════════════════════════════════════════
     function renderLogs() {
       var container = document.getElementById('logsContainer');
+      if (!container) return;
       clearChildren(container);
 
       var entries = logsData && (logsData.entries || logsData.logs || logsData);
@@ -1732,33 +1996,12 @@
       container.appendChild(panel);
     }
 
-    // ── Cron Mini (sidebar) ──
-    function renderCronMini() {
-      var list = document.getElementById('cronMiniList');
-      clearChildren(list);
-
-      if (!cronData || !cronData.jobs || !cronData.jobs.length) {
-        list.appendChild(h('li', {}, h('span', { className: 'cron-name', style: { color: '#666' } }, 'No jobs')));
-        return;
-      }
-
-      var upcoming = cronData.jobs
-        .filter(function(j) { return j.enabled && j.state && j.state.nextRunAtMs; })
-        .sort(function(a, b) { return a.state.nextRunAtMs - b.state.nextRunAtMs; })
-        .slice(0, 8);
-
-      upcoming.forEach(function(job) {
-        var next = formatRelativeTime(job.state.nextRunAtMs);
-        list.appendChild(h('li', {}, [
-          h('span', { className: 'cron-name' }, job.name),
-          h('span', { className: 'cron-next' }, next)
-        ]));
-      });
-    }
-
-    // ── Gateway Info ──
+    // ═══════════════════════════════════════════
+    // GATEWAY INFO
+    // ═══════════════════════════════════════════
     function renderGatewayInfo() {
       var el = document.getElementById('gatewayInfo');
+      if (!el) return;
       clearChildren(el);
 
       if (!statusData) {
@@ -1788,9 +2031,12 @@
       });
     }
 
-    // ── Health Banner ──
+    // ═══════════════════════════════════════════
+    // HEALTH BANNER
+    // ═══════════════════════════════════════════
     function renderHealthBanner() {
       var banner = document.getElementById('healthBanner');
+      if (!banner) return;
       clearChildren(banner);
       banner.className = 'health-banner';
 
@@ -1830,10 +2076,13 @@
       });
     }
 
-    // ── Refresh indicator ──
+    // ═══════════════════════════════════════════
+    // REFRESH BAR
+    // ═══════════════════════════════════════════
     function updateRefreshBar() {
       var bar = document.getElementById('refreshBar');
       var text = document.getElementById('refreshText');
+      if (!bar || !text) return;
 
       if (isFetching) {
         bar.className = 'refresh-bar fetching';
@@ -1849,10 +2098,12 @@
       var ago = Math.round((Date.now() - lastRefreshAt) / 1000);
       var stale = ago > 30;
       bar.className = 'refresh-bar' + (stale ? ' stale' : '');
-      text.textContent = 'Updated ' + ago + 's ago' + (stale ? ' (stale)' : '') + ' \u2022 Auto-refresh 15s';
+      text.textContent = 'Updated ' + ago + 's ago' + (stale ? ' (stale)' : '');
     }
 
-    // ── Chat Panel ──
+    // ═══════════════════════════════════════════
+    // CHAT PANEL
+    // ═══════════════════════════════════════════
     function openChat(sessionId, sessionKey, model) {
       currentChatSession = { sessionId: sessionId, sessionKey: sessionKey, model: model };
 
@@ -1863,7 +2114,6 @@
       var msgArea = document.getElementById('chatMessages');
       clearChildren(msgArea);
 
-      // Restore chat history
       var history = getChatHistory(sessionId);
       if (history.length > 0) {
         history.forEach(function(msg) {
@@ -1893,10 +2143,8 @@
       var sendBtn = document.getElementById('chatSendBtn');
       var typing = document.getElementById('typingIndicator');
 
-      // Guard against double-fire
       if (sendBtn.disabled) return;
 
-      // Add user message
       msgArea.appendChild(h('div', { className: 'chat-msg user' }, msg));
       addChatMessage(currentChatSession.sessionId, 'user', msg);
 
@@ -1929,7 +2177,6 @@
       } catch (e) {
         typing.classList.remove('active');
         msgArea.appendChild(h('div', { className: 'chat-msg error' }, 'Error: ' + e.message));
-        // Don't persist error messages to history
       }
 
       sendBtn.disabled = false;
@@ -1954,7 +2201,6 @@
       return JSON.stringify(data, null, 2);
     }
 
-    // Enter to send
     document.getElementById('chatInput').addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -1962,7 +2208,6 @@
       }
     });
 
-    // Thinking level pills
     document.querySelectorAll('.thinking-pill').forEach(function(pill) {
       pill.addEventListener('click', function() {
         document.querySelectorAll('.thinking-pill').forEach(function(p) { p.classList.remove('active'); });
@@ -1971,7 +2216,9 @@
       });
     });
 
-    // ── Cron Run ──
+    // ═══════════════════════════════════════════
+    // CRON OPERATIONS
+    // ═══════════════════════════════════════════
     async function runCronJob(jobId, btn) {
       btn.disabled = true;
       btn.textContent = 'Running...';
@@ -2013,7 +2260,9 @@
       }
     }
 
-    // ── Spawn Modal ──
+    // ═══════════════════════════════════════════
+    // SPAWN MODAL
+    // ═══════════════════════════════════════════
     function openSpawnModal() {
       document.getElementById('spawnModal').classList.add('active');
       document.getElementById('spawnMessage').focus();
@@ -2025,7 +2274,7 @@
 
     async function sendSpawnMessage() {
       var btn = document.getElementById('spawnBtn');
-      if (btn.disabled) return; // Guard double-fire
+      if (btn.disabled) return;
 
       var msg = document.getElementById('spawnMessage').value.trim();
       var agentId = document.getElementById('spawnAgentId').value.trim();
@@ -2045,7 +2294,7 @@
         toast('Message sent to agent');
         closeSpawnModal();
         document.getElementById('spawnMessage').value = '';
-        document.getElementById('spawnAgentId').value = 'main'; // Reset to default
+        document.getElementById('spawnAgentId').value = 'main';
       } catch (e) {
         toast('Failed: ' + e.message, true);
       }
@@ -2054,42 +2303,43 @@
       btn.textContent = 'Send to Agent';
     }
 
-    // ── Tabs ──
-    function switchTab(target) {
-      document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-      document.querySelector('.tab[data-tab="' + target + '"]').classList.add('active');
+    // ═══════════════════════════════════════════
+    // OVERLAY SYSTEM
+    // ═══════════════════════════════════════════
+    function openOverlay(stationId) {
+      var station = stations.find(function(s) { return s.id === stationId; });
+      if (!station) return;
 
-      ALL_TABS.forEach(function(tabId) {
-        document.getElementById('tab-' + tabId).classList.toggle('hidden', tabId !== target);
-      });
+      activeOverlay = stationId;
+      document.getElementById(station.overlayId).classList.add('active');
 
-      // Lazy-load data on first visit
-      if (!tabLoaded[target]) {
-        tabLoaded[target] = true;
-        if (target === 'agents') fetchAgents();
-        else if (target === 'skills') fetchSkills();
-        else if (target === 'logs') fetchLogs();
+      // Lazy load data on first visit
+      if (!stationLoaded[stationId]) {
+        stationLoaded[stationId] = true;
+        if (stationId === 'agents') fetchAgents();
+        else if (stationId === 'skills') fetchSkills();
+        else if (stationId === 'logs') fetchLogs();
       }
     }
 
-    document.querySelectorAll('.tab').forEach(function(tab) {
-      tab.addEventListener('click', function() {
-        switchTab(tab.dataset.tab);
-      });
-    });
-
-    // ── Global keyboard shortcuts ──
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') {
-        if (document.getElementById('chatPanel').classList.contains('active')) {
-          closeChat();
-        } else if (document.getElementById('spawnModal').classList.contains('active')) {
-          closeSpawnModal();
-        }
+    function closeOverlay() {
+      if (!activeOverlay) return;
+      var station = stations.find(function(s) { return s.id === activeOverlay; });
+      if (station) {
+        document.getElementById(station.overlayId).classList.remove('active');
       }
-    });
+      activeOverlay = null;
+    }
 
-    // ── Helpers ──
+    // Compatibility wrapper for old switchTab calls
+    function switchTab(target) {
+      closeOverlay();
+      openOverlay(target);
+    }
+
+    // ═══════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════
     function formatSessionKeyForChat(key) {
       if (!sessionsData || !sessionsData.sessions) return key;
       var s = sessionsData.sessions.find(function(sess) { return sess.key === key; });
@@ -2119,24 +2369,597 @@
       return 'In ' + days + 'd';
     }
 
-    // ── Init & Auto-refresh ──
+    // ═══════════════════════════════════════════
+    // CANVAS SETUP
+    // ═══════════════════════════════════════════
+    var canvas = document.getElementById('gameCanvas');
+    var ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ═══════════════════════════════════════════
+    // FLOOR PRE-RENDERING
+    // ═══════════════════════════════════════════
+    function prerenderFloor() {
+      floorCtx.fillStyle = '#0a0a12';
+      floorCtx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+      // Grid lines
+      floorCtx.strokeStyle = 'rgba(0,212,255,0.03)';
+      floorCtx.lineWidth = 1;
+      for (var x = 0; x <= WORLD_W; x += GRID_SIZE) {
+        floorCtx.beginPath();
+        floorCtx.moveTo(x + 0.5, 0);
+        floorCtx.lineTo(x + 0.5, WORLD_H);
+        floorCtx.stroke();
+      }
+      for (var y = 0; y <= WORLD_H; y += GRID_SIZE) {
+        floorCtx.beginPath();
+        floorCtx.moveTo(0, y + 0.5);
+        floorCtx.lineTo(WORLD_W, y + 0.5);
+        floorCtx.stroke();
+      }
+
+      // Radial vignette
+      var grad = floorCtx.createRadialGradient(WORLD_W / 2, WORLD_H / 2, 200, WORLD_W / 2, WORLD_H / 2, WORLD_W * 0.55);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.4)');
+      floorCtx.fillStyle = grad;
+      floorCtx.fillRect(0, 0, WORLD_W, WORLD_H);
+    }
+
+    prerenderFloor();
+
+    // ═══════════════════════════════════════════
+    // PARTICLES
+    // ═══════════════════════════════════════════
+    function initParticles() {
+      for (var i = 0; i < PARTICLE_COUNT; i++) {
+        particles.push({
+          x: Math.random() * WORLD_W,
+          y: Math.random() * WORLD_H,
+          vx: (Math.random() - 0.5) * 20,
+          vy: (Math.random() - 0.5) * 15,
+          alpha: Math.random() * 0.25 + 0.05,
+          size: Math.random() * 2 + 1
+        });
+      }
+    }
+
+    initParticles();
+
+    function updateParticles(dt) {
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        // Wrap around
+        if (p.x < 0) p.x += WORLD_W;
+        if (p.x > WORLD_W) p.x -= WORLD_W;
+        if (p.y < 0) p.y += WORLD_H;
+        if (p.y > WORLD_H) p.y -= WORLD_H;
+      }
+    }
+
+    function renderParticles(ctx) {
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        ctx.fillStyle = 'rgba(0,212,255,' + p.alpha + ')';
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+      }
+    }
+
+    // ═══════════════════════════════════════════
+    // COLLISION DETECTION
+    // ═══════════════════════════════════════════
+    function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+      return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+    }
+
+    function checkCollision(px, py) {
+      var half = PLAYER_SIZE / 2;
+      var pLeft = px - half;
+      var pTop = py - half;
+
+      // Wall collisions
+      if (pLeft < WALL_T || pLeft + PLAYER_SIZE > WORLD_W - WALL_T) return true;
+      if (pTop < WALL_T || pTop + PLAYER_SIZE > WORLD_H - WALL_T) return true;
+
+      // Station collisions
+      for (var i = 0; i < stations.length; i++) {
+        var s = stations[i];
+        if (rectsOverlap(pLeft, pTop, PLAYER_SIZE, PLAYER_SIZE, s.x, s.y, s.w, s.h)) return true;
+      }
+
+      return false;
+    }
+
+    // ═══════════════════════════════════════════
+    // PROXIMITY DETECTION
+    // ═══════════════════════════════════════════
+    function updateNearestStation() {
+      nearestStation = null;
+      var minDist = Infinity;
+
+      for (var i = 0; i < stations.length; i++) {
+        var s = stations[i];
+        var dx = player.x - s.cx;
+        var dy = player.y - s.cy;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        // Check distance from player to nearest edge of station, not center
+        var edgeDist = dist - Math.max(s.w, s.h) / 2;
+        if (edgeDist < s.interactRadius && dist < minDist) {
+          minDist = dist;
+          nearestStation = s;
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════
+    // CAMERA
+    // ═══════════════════════════════════════════
+    function updateCamera(dt) {
+      var targetX = player.x - canvas.width / 2;
+      var targetY = player.y - canvas.height / 2;
+
+      // Clamp to world bounds
+      var maxX = WORLD_W - canvas.width;
+      var maxY = WORLD_H - canvas.height;
+
+      if (canvas.width >= WORLD_W) {
+        targetX = (WORLD_W - canvas.width) / 2;
+      } else {
+        targetX = Math.max(0, Math.min(targetX, maxX));
+      }
+
+      if (canvas.height >= WORLD_H) {
+        targetY = (WORLD_H - canvas.height) / 2;
+      } else {
+        targetY = Math.max(0, Math.min(targetY, maxY));
+      }
+
+      camera.x += (targetX - camera.x) * CAMERA_SMOOTH;
+      camera.y += (targetY - camera.y) * CAMERA_SMOOTH;
+    }
+
+    // ═══════════════════════════════════════════
+    // CANVAS RENDERING HELPERS
+    // ═══════════════════════════════════════════
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.arcTo(x + w, y, x + w, y + r, r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+      ctx.lineTo(x + r, y + h);
+      ctx.arcTo(x, y + h, x, y + h - r, r);
+      ctx.lineTo(x, y + r);
+      ctx.arcTo(x, y, x + r, y, r);
+      ctx.closePath();
+    }
+
+    // ═══════════════════════════════════════════
+    // WALL RENDERING
+    // ═══════════════════════════════════════════
+    function renderWalls(ctx) {
+      ctx.fillStyle = '#1a1a2e';
+      // Top
+      ctx.fillRect(0, 0, WORLD_W, WALL_T);
+      // Bottom
+      ctx.fillRect(0, WORLD_H - WALL_T, WORLD_W, WALL_T);
+      // Left
+      ctx.fillRect(0, 0, WALL_T, WORLD_H);
+      // Right
+      ctx.fillRect(WORLD_W - WALL_T, 0, WALL_T, WORLD_H);
+
+      // Glowing inner edge
+      ctx.strokeStyle = 'rgba(0,212,255,0.12)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(WALL_T + 0.5, WALL_T + 0.5, WORLD_W - 2 * WALL_T - 1, WORLD_H - 2 * WALL_T - 1);
+    }
+
+    // ═══════════════════════════════════════════
+    // STATION CANVAS RENDERING
+    // ═══════════════════════════════════════════
+    function renderStations(ctx) {
+      for (var i = 0; i < stations.length; i++) {
+        var s = stations[i];
+        var isNear = nearestStation === s && !activeOverlay;
+        var statusColor = s.getStatusColor();
+        var subInfo = s.getSubInfo();
+
+        ctx.save();
+
+        // Glow when player is near
+        if (isNear) {
+          ctx.shadowColor = s.colorPrimary;
+          ctx.shadowBlur = 25;
+        }
+
+        // Station body
+        roundRect(ctx, s.x, s.y, s.w, s.h, 12);
+        ctx.fillStyle = 'rgba(18,18,31,0.92)';
+        ctx.fill();
+
+        // Border
+        ctx.strokeStyle = isNear ? s.colorPrimary : 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = isNear ? 2 : 1;
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+
+        // Colored top accent bar
+        roundRect(ctx, s.x, s.y, s.w, 4, 2);
+        ctx.fillStyle = s.colorPrimary;
+        ctx.fill();
+
+        // Gateway Core special: concentric rings
+        if (s.id === 'gateway') {
+          for (var r = 0; r < 3; r++) {
+            var radius = 50 + r * 22 + Math.sin(animTimer * 2 + r * 1.2) * 6;
+            ctx.beginPath();
+            ctx.arc(s.cx, s.cy, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0,212,255,' + (0.08 - r * 0.02) + ')';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+
+        // Emoji
+        ctx.font = '26px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(s.emoji, s.cx, s.cy - 12);
+
+        // Label
+        ctx.font = '600 12px "SF Pro Display", -apple-system, sans-serif';
+        ctx.fillStyle = '#e0e0e0';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(s.label, s.cx, s.cy + 16);
+
+        // Status dot (top-right)
+        var dotX = s.x + s.w - 14;
+        var dotY = s.y + 14;
+        var dotPulse = 0.6 + Math.sin(animTimer * 3) * 0.4;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = statusColor;
+        ctx.globalAlpha = dotPulse;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Sub-info text
+        ctx.font = '11px "SF Pro Display", -apple-system, sans-serif';
+        ctx.fillStyle = '#888';
+        ctx.fillText(subInfo, s.cx, s.y + s.h - 14);
+
+        ctx.restore();
+      }
+    }
+
+    // ═══════════════════════════════════════════
+    // PLAYER RENDERING
+    // ═══════════════════════════════════════════
+    function renderPlayer(ctx, px, py) {
+      var s = PLAYER_SIZE / 2;
+
+      // Bob animation when moving
+      var bob = player.moving ? Math.sin(animTimer * 10) * 2 : 0;
+      var drawY = py + bob;
+
+      ctx.save();
+
+      // Outer glow
+      ctx.shadowColor = '#00d4ff';
+      ctx.shadowBlur = 20;
+
+      // Diamond shape (outer)
+      ctx.beginPath();
+      ctx.moveTo(px, drawY - s);
+      ctx.lineTo(px + s, drawY);
+      ctx.lineTo(px, drawY + s);
+      ctx.lineTo(px - s, drawY);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,212,255,0.3)';
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+
+      // White core diamond
+      var cs = s * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(px, drawY - cs);
+      ctx.lineTo(px + cs, drawY);
+      ctx.lineTo(px, drawY + cs);
+      ctx.lineTo(px - cs, drawY);
+      ctx.closePath();
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      // Direction indicator dot
+      if (player.moving) {
+        var dirDist = s + 7;
+        var dirX = px + Math.cos(player.dir) * dirDist;
+        var dirY = drawY + Math.sin(player.dir) * dirDist;
+        ctx.beginPath();
+        ctx.arc(dirX, dirY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#00d4ff';
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // ═══════════════════════════════════════════
+    // HUD UPDATE
+    // ═══════════════════════════════════════════
+    function updateHUD() {
+      var prompt = document.getElementById('interactPrompt');
+      if (nearestStation && !activeOverlay) {
+        prompt.textContent = 'Press E \u2014 ' + nearestStation.emoji + ' ' + nearestStation.label;
+        prompt.classList.add('visible');
+      } else {
+        prompt.classList.remove('visible');
+      }
+    }
+
+    // ═══════════════════════════════════════════
+    // MINIMAP
+    // ═══════════════════════════════════════════
+    function renderMinimap() {
+      var mc = document.getElementById('minimapCanvas');
+      var mctx = mc.getContext('2d');
+      var sw = mc.width / WORLD_W;
+      var sh = mc.height / WORLD_H;
+
+      mctx.clearRect(0, 0, mc.width, mc.height);
+
+      // Background
+      mctx.fillStyle = 'rgba(10,10,18,0.85)';
+      mctx.fillRect(0, 0, mc.width, mc.height);
+
+      // Room outline
+      mctx.strokeStyle = 'rgba(0,212,255,0.25)';
+      mctx.lineWidth = 1;
+      mctx.strokeRect(0.5, 0.5, mc.width - 1, mc.height - 1);
+
+      // Stations as colored rectangles
+      for (var i = 0; i < stations.length; i++) {
+        var s = stations[i];
+        mctx.fillStyle = s.colorPrimary;
+        mctx.globalAlpha = 0.6;
+        mctx.fillRect(
+          Math.round(s.x * sw),
+          Math.round(s.y * sh),
+          Math.max(Math.round(s.w * sw), 3),
+          Math.max(Math.round(s.h * sh), 2)
+        );
+      }
+      mctx.globalAlpha = 1;
+
+      // Viewport rectangle
+      mctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      mctx.lineWidth = 1;
+      mctx.strokeRect(
+        Math.round(camera.x * sw),
+        Math.round(camera.y * sh),
+        Math.round(canvas.width * sw),
+        Math.round(canvas.height * sh)
+      );
+
+      // Player dot
+      mctx.fillStyle = '#00d4ff';
+      mctx.beginPath();
+      mctx.arc(Math.round(player.x * sw), Math.round(player.y * sh), 3, 0, Math.PI * 2);
+      mctx.fill();
+    }
+
+    // ═══════════════════════════════════════════
+    // GAME UPDATE
+    // ═══════════════════════════════════════════
+    function update(dt) {
+      player.prevX = player.x;
+      player.prevY = player.y;
+
+      animTimer += dt;
+
+      // Don't move if overlay is open or inputs are focused
+      if (activeOverlay) {
+        player.moving = false;
+        updateCamera(dt);
+        updateParticles(dt);
+        return;
+      }
+
+      var dx = 0, dy = 0;
+      if (keysDown['w'] || keysDown['arrowup']) dy -= 1;
+      if (keysDown['s'] || keysDown['arrowdown']) dy += 1;
+      if (keysDown['a'] || keysDown['arrowleft']) dx -= 1;
+      if (keysDown['d'] || keysDown['arrowright']) dx += 1;
+
+      // Diagonal normalization
+      if (dx !== 0 && dy !== 0) {
+        var inv = 1 / Math.sqrt(2);
+        dx *= inv;
+        dy *= inv;
+      }
+
+      player.moving = dx !== 0 || dy !== 0;
+      if (player.moving) {
+        player.dir = Math.atan2(dy, dx);
+      }
+
+      // Axis-separated collision (enables wall sliding)
+      var newX = player.x + dx * PLAYER_SPEED * dt;
+      if (!checkCollision(newX, player.y)) {
+        player.x = newX;
+      }
+
+      var newY = player.y + dy * PLAYER_SPEED * dt;
+      if (!checkCollision(player.x, newY)) {
+        player.y = newY;
+      }
+
+      // Proximity detection
+      updateNearestStation();
+
+      // Camera
+      updateCamera(dt);
+
+      // Particles
+      updateParticles(dt);
+    }
+
+    // ═══════════════════════════════════════════
+    // GAME RENDER
+    // ═══════════════════════════════════════════
+    function render(alpha) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
+
+      // Floor
+      ctx.drawImage(floorCanvas, 0, 0);
+
+      // Walls
+      renderWalls(ctx);
+
+      // Particles (behind stations)
+      renderParticles(ctx);
+
+      // Stations
+      renderStations(ctx);
+
+      // Player (with interpolation)
+      var px = player.prevX + (player.x - player.prevX) * alpha;
+      var py = player.prevY + (player.y - player.prevY) * alpha;
+      renderPlayer(ctx, px, py);
+
+      ctx.restore();
+
+      // HUD + Minimap (screen-space)
+      updateHUD();
+      renderMinimap();
+    }
+
+    // ═══════════════════════════════════════════
+    // GAME LOOP
+    // ═══════════════════════════════════════════
+    function gameLoop(timestamp) {
+      requestAnimationFrame(gameLoop);
+
+      if (!lastTime) {
+        lastTime = timestamp;
+        return;
+      }
+
+      var dt = timestamp - lastTime;
+      lastTime = timestamp;
+
+      // Clamp to prevent spiral of death after tab switch
+      if (dt > 200) dt = 200;
+
+      accumulator += dt;
+
+      while (accumulator >= TICK_RATE) {
+        update(TICK_RATE / 1000);
+        accumulator -= TICK_RATE;
+      }
+
+      var alpha = accumulator / TICK_RATE;
+      render(alpha);
+    }
+
+    // ═══════════════════════════════════════════
+    // INPUT HANDLING
+    // ═══════════════════════════════════════════
+    document.addEventListener('keydown', function(e) {
+      var key = e.key.toLowerCase();
+
+      // Don't capture if typing in an input/textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        if (key === 'escape') {
+          e.target.blur();
+        }
+        return;
+      }
+
+      keysDown[key] = true;
+
+      // Interact with nearest station
+      if ((key === 'e' || key === 'enter') && !activeOverlay) {
+        if (nearestStation) {
+          e.preventDefault();
+          openOverlay(nearestStation.id);
+        }
+      }
+
+      // Close active panel
+      if (key === 'escape') {
+        if (document.getElementById('chatPanel').classList.contains('active')) {
+          closeChat();
+        } else if (activeOverlay) {
+          closeOverlay();
+        } else if (document.getElementById('spawnModal').classList.contains('active')) {
+          closeSpawnModal();
+        }
+      }
+
+      // Quick message modal
+      if (key === 'm' && !activeOverlay && !document.getElementById('chatPanel').classList.contains('active')) {
+        openSpawnModal();
+      }
+
+      // Prevent arrow key scrolling
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].indexOf(key) !== -1) {
+        e.preventDefault();
+      }
+    });
+
+    document.addEventListener('keyup', function(e) {
+      keysDown[e.key.toLowerCase()] = false;
+    });
+
+    window.addEventListener('blur', function() {
+      keysDown = {};
+    });
+
+    // ═══════════════════════════════════════════
+    // INIT + AUTO-REFRESH
+    // ═══════════════════════════════════════════
+
+    // Initialize camera to player position
+    camera.x = player.x - canvas.width / 2;
+    camera.y = player.y - canvas.height / 2;
+
+    // Start game loop
+    requestAnimationFrame(gameLoop);
+
+    // Fetch initial data
     refreshAll();
 
-    // Single data interval (15s) — skip when tab backgrounded
+    // Data refresh interval (15s)
     var dataIntervalId = setInterval(function() {
       if (document.hidden) return;
       fetchStatus();
       fetchSessions();
-      // Refresh cron every 60s (check staleness)
       if (Date.now() - lastCronRefreshAt > 60000) {
         fetchCron();
       }
     }, 15000);
 
-    // Single tick interval (1s) for refresh counter
+    // Refresh counter tick (1s)
     var tickIntervalId = setInterval(updateRefreshBar, 1000);
 
-    // Clean up intervals on page unload
+    // Clean up on unload
     window.addEventListener('beforeunload', function() {
       clearInterval(dataIntervalId);
       clearInterval(tickIntervalId);
