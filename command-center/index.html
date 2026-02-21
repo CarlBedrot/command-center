@@ -607,7 +607,7 @@
       position: fixed;
       top: 0;
       right: 0;
-      width: 480px;
+      width: 350px;
       height: 100vh;
       background: #12121f;
       border-left: 1px solid rgba(255,255,255,0.1);
@@ -979,8 +979,73 @@
     }
 
     @media (min-width: 601px) and (max-width: 900px) {
-      .chat-overlay { width: 380px !important; }
+      .chat-overlay { width: 320px !important; }
     }
+
+    /* ── NPC Speech Bubble Input ── */
+    .npc-chat-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 200;
+      background: rgba(12,12,20,0.9);
+      backdrop-filter: blur(8px);
+      border-radius: 14px;
+      padding: 8px 12px;
+      border: 1.5px solid rgba(255,255,255,0.12);
+      width: 480px;
+      max-width: 90vw;
+    }
+
+    .npc-chat-bar.active { display: flex; }
+
+    .npc-chat-bar .npc-chat-label {
+      font-size: 0.75rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .npc-chat-bar input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #e0e0e0;
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+      padding: 4px 0;
+    }
+
+    .npc-chat-bar .npc-send-btn {
+      background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .npc-chat-bar .npc-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .npc-chat-bar .npc-expand-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #888;
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      flex-shrink: 0;
+    }
+
+    .npc-chat-bar .npc-expand-btn:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
   </style>
 </head>
 <body>
@@ -1172,6 +1237,13 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <div class="npc-chat-bar" id="npcChatBar">
+    <span class="npc-chat-label" id="npcChatLabel">JARVIS:</span>
+    <input type="text" id="npcChatInput" placeholder="Say something...">
+    <button class="npc-send-btn" id="npcSendBtn">Send</button>
+    <button class="npc-expand-btn" id="npcExpandBtn" title="Expand to panel">&#x2197;</button>
   </div>
 
   <div class="activity-feed" id="activityFeed"></div>
@@ -2357,6 +2429,38 @@
       }
     });
 
+    document.getElementById('npcSendBtn').addEventListener('click', sendNPCMessage);
+    document.getElementById('npcChatInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendNPCMessage();
+      }
+      if (e.key === 'Escape') {
+        closeNPCChat();
+      }
+    });
+    document.getElementById('npcExpandBtn').addEventListener('click', function() {
+      if (!activeNPCChat) return;
+      var npc = activeNPCChat.npc;
+      closeNPCChat();
+      var sessionId = null;
+      var sessionKey = 'agent:' + npc.sessionKey + ':' + npc.sessionKey;
+      if (sessionsData && sessionsData.sessions) {
+        var match = sessionsData.sessions.find(function(s) {
+          return s.key && s.key.indexOf(':' + npc.sessionKey) !== -1;
+        });
+        if (match) {
+          sessionId = match.sessionId;
+          sessionKey = match.key;
+        }
+      }
+      if (sessionId) {
+        openChat(sessionId, sessionKey, '');
+      } else {
+        toast('No session found for ' + npc.name, true);
+      }
+    });
+
     document.querySelectorAll('.thinking-pill').forEach(function(pill) {
       pill.addEventListener('click', function() {
         document.querySelectorAll('.thinking-pill').forEach(function(p) { p.classList.remove('active'); });
@@ -3072,6 +3176,14 @@
         if (rectsOverlap(pLeft, pTop, PLAYER_SIZE, PLAYER_SIZE, s.x, s.y, s.w, s.h)) return true;
       }
 
+      // NPC collisions
+      for (var i = 0; i < npcCharacters.length; i++) {
+        var npc = npcCharacters[i];
+        var ndx = px - npc.cx;
+        var ndy = py - npc.cy;
+        if (Math.sqrt(ndx * ndx + ndy * ndy) < NPC_SIZE + half) return true;
+      }
+
       return false;
     }
 
@@ -3092,6 +3204,21 @@
         if (edgeDist < s.interactRadius && dist < minDist) {
           minDist = dist;
           nearestStation = s;
+        }
+      }
+    }
+
+    function updateNearestNPC() {
+      nearestNPC = null;
+      var minDist = Infinity;
+      for (var i = 0; i < npcCharacters.length; i++) {
+        var npc = npcCharacters[i];
+        var dx = player.x - npc.cx;
+        var dy = player.y - npc.cy;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < NPC_INTERACT_RADIUS && dist < minDist) {
+          minDist = dist;
+          nearestNPC = npc;
         }
       }
     }
@@ -3297,6 +3424,165 @@
     }
 
     // ═══════════════════════════════════════════
+    // SPEECH BUBBLES
+    // ═══════════════════════════════════════════
+    var speechBubbles = [];
+
+    function addSpeechBubble(npcId, text, duration) {
+      speechBubbles = speechBubbles.filter(function(b) { return b.npcId !== npcId; });
+      var npc = npcCharacters.find(function(n) { return n.id === npcId; });
+      if (!npc) return;
+      speechBubbles.push({
+        npcId: npcId,
+        text: text.length > 180 ? text.substring(0, 177) + '...' : text,
+        fullText: text,
+        life: duration || 8,
+        maxLife: duration || 8,
+        x: npc.cx,
+        y: npc.cy - NPC_SIZE - 30
+      });
+    }
+
+    function updateSpeechBubbles(dt) {
+      for (var i = speechBubbles.length - 1; i >= 0; i--) {
+        speechBubbles[i].life -= dt;
+        if (speechBubbles[i].life <= 0) speechBubbles.splice(i, 1);
+      }
+    }
+
+    function renderSpeechBubbles(ctx) {
+      ctx.save();
+      for (var i = 0; i < speechBubbles.length; i++) {
+        var b = speechBubbles[i];
+        var alpha = Math.min(1, b.life / 1.0);
+        if (b.life > b.maxLife - 0.3) alpha = (b.maxLife - b.life) / 0.3;
+
+        ctx.globalAlpha = Math.max(0, alpha);
+        ctx.font = '12px "SF Pro Display", -apple-system, sans-serif';
+
+        var maxWidth = 220;
+        var words = b.text.split(' ');
+        var lines = [];
+        var currentLine = '';
+        for (var w = 0; w < words.length; w++) {
+          var testLine = currentLine ? currentLine + ' ' + words[w] : words[w];
+          if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = words[w];
+          } else {
+            currentLine = testLine;
+          }
+        }
+        if (currentLine) lines.push(currentLine);
+
+        var lineHeight = 16;
+        var padding = 10;
+        var bubbleW = 0;
+        for (var l = 0; l < lines.length; l++) {
+          var lw = ctx.measureText(lines[l]).width;
+          if (lw > bubbleW) bubbleW = lw;
+        }
+        bubbleW += padding * 2;
+        var bubbleH = lines.length * lineHeight + padding * 2;
+        var bx = b.x - bubbleW / 2;
+        var by = b.y - bubbleH;
+
+        roundRect(ctx, bx, by, bubbleW, bubbleH, 10);
+        ctx.fillStyle = 'rgba(18,18,31,0.92)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Triangle pointer
+        ctx.beginPath();
+        ctx.moveTo(b.x - 6, by + bubbleH);
+        ctx.lineTo(b.x, by + bubbleH + 8);
+        ctx.lineTo(b.x + 6, by + bubbleH);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(18,18,31,0.92)';
+        ctx.fill();
+
+        ctx.fillStyle = '#e0e0e0';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        for (var l = 0; l < lines.length; l++) {
+          ctx.fillText(lines[l], bx + padding, by + padding + l * lineHeight);
+        }
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // ═══════════════════════════════════════════
+    // NPC CHAT
+    // ═══════════════════════════════════════════
+    function openNPCChat(npc) {
+      activeNPCChat = { npc: npc, expanded: false };
+      var bar = document.getElementById('npcChatBar');
+      var label = document.getElementById('npcChatLabel');
+      var input = document.getElementById('npcChatInput');
+      label.textContent = npc.emoji + ' ' + npc.name + ':';
+      label.style.color = npc.color;
+      bar.style.borderColor = npc.color + '40';
+      bar.classList.add('active');
+      input.value = '';
+      input.focus();
+    }
+
+    function closeNPCChat() {
+      activeNPCChat = null;
+      document.getElementById('npcChatBar').classList.remove('active');
+    }
+
+    async function sendNPCMessage() {
+      if (!activeNPCChat) return;
+      var input = document.getElementById('npcChatInput');
+      var msg = input.value.trim();
+      if (!msg) return;
+
+      var npc = activeNPCChat.npc;
+      var sendBtn = document.getElementById('npcSendBtn');
+      if (sendBtn.disabled) return;
+      sendBtn.disabled = true;
+      input.value = '';
+
+      // Find session for this agent
+      var sessionId = null;
+      if (sessionsData && sessionsData.sessions) {
+        var match = sessionsData.sessions.find(function(s) {
+          return s.key && s.key.indexOf(':' + npc.sessionKey) !== -1;
+        });
+        if (match) sessionId = match.sessionId;
+      }
+
+      try {
+        var body = { message: msg };
+        if (sessionId) body.sessionId = sessionId;
+        else body.agentId = npc.id;
+
+        var data = await api('/api/agent/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        var responseText = extractAgentResponse(data);
+        addSpeechBubble(npc.id, responseText, responseText.length > 100 ? 12 : 8);
+
+        if (sessionId) {
+          addChatMessage(sessionId, 'user', msg);
+          addChatMessage(sessionId, 'agent', responseText);
+        }
+      } catch (e) {
+        addSpeechBubble(npc.id, 'Error: ' + e.message, 5);
+      }
+
+      sendBtn.disabled = false;
+      input.focus();
+    }
+
+    // ═══════════════════════════════════════════
     // NPC RENDERING
     // ═══════════════════════════════════════════
     function renderNPCs(ctx) {
@@ -3413,7 +3699,13 @@
     // ═══════════════════════════════════════════
     function updateHUD() {
       var prompt = document.getElementById('interactPrompt');
-      if (nearestStation && !activeOverlay) {
+      if (nearestNPC && !activeOverlay && !activeNPCChat) {
+        prompt.textContent = 'Press E \u2014 Talk to ' + nearestNPC.emoji + ' ' + nearestNPC.name;
+        prompt.style.whiteSpace = 'pre-line';
+        prompt.style.borderColor = nearestNPC.color;
+        prompt.style.borderWidth = '1.5px';
+        prompt.classList.add('visible');
+      } else if (nearestStation && !activeOverlay && !nearestNPC) {
         var stats = getStationQuickStats(nearestStation);
         var lines = 'Press E \u2014 ' + nearestStation.emoji + ' ' + nearestStation.label;
         if (stats) lines += '\n' + stats;
@@ -3422,7 +3714,7 @@
         prompt.style.borderColor = nearestStation.colorPrimary;
         prompt.style.borderWidth = '1.5px';
         prompt.classList.add('visible');
-      } else {
+      } else if (!activeOverlay && !activeNPCChat) {
         prompt.classList.remove('visible');
         prompt.style.borderColor = '';
         prompt.style.borderWidth = '';
@@ -3497,6 +3789,17 @@
       }
       mctx.globalAlpha = 1;
 
+      // NPC dots on minimap
+      for (var i = 0; i < npcCharacters.length; i++) {
+        var npc = npcCharacters[i];
+        mctx.fillStyle = npc.color;
+        mctx.globalAlpha = 0.8;
+        mctx.beginPath();
+        mctx.arc(Math.round(npc.cx * sw), Math.round(npc.cy * sh), 2.5, 0, Math.PI * 2);
+        mctx.fill();
+      }
+      mctx.globalAlpha = 1;
+
       // Viewport rectangle
       mctx.strokeStyle = 'rgba(255,255,255,0.35)';
       mctx.lineWidth = 1;
@@ -3563,6 +3866,7 @@
 
       // Proximity detection
       updateNearestStation();
+      updateNearestNPC();
 
       // Camera
       updateCamera(dt);
@@ -3573,6 +3877,7 @@
 
       // Notifications
       updateNotifications(dt);
+      updateSpeechBubbles(dt);
       updateDataPackets(dt);
 
       // Player trail
@@ -3613,6 +3918,7 @@
 
       // NPC Characters
       renderNPCs(ctx);
+      renderSpeechBubbles(ctx);
 
       // Player trail
       for (var ti = 0; ti < playerTrail.length; ti++) {
@@ -3683,9 +3989,12 @@
 
       keysDown[key] = true;
 
-      // Interact with nearest station
+      // Interact with nearest NPC or station
       if ((key === 'e' || key === 'enter') && !activeOverlay) {
-        if (nearestStation) {
+        if (nearestNPC) {
+          e.preventDefault();
+          openNPCChat(nearestNPC);
+        } else if (nearestStation) {
           e.preventDefault();
           openOverlay(nearestStation.id);
         }
@@ -3693,7 +4002,9 @@
 
       // Close active panel
       if (key === 'escape') {
-        if (document.getElementById('chatPanel').classList.contains('active')) {
+        if (activeNPCChat) {
+          closeNPCChat();
+        } else if (document.getElementById('chatPanel').classList.contains('active')) {
           closeChat();
         } else if (activeOverlay) {
           closeOverlay();
@@ -3742,10 +4053,29 @@
       return null;
     }
 
+    function getNPCAtScreen(sx, sy) {
+      var wx = sx + camera.x;
+      var wy = sy + camera.y;
+      for (var i = 0; i < npcCharacters.length; i++) {
+        var npc = npcCharacters[i];
+        var dx = wx - npc.cx;
+        var dy = wy - npc.cy;
+        if (Math.sqrt(dx * dx + dy * dy) < NPC_SIZE + 8) return npc;
+      }
+      return null;
+    }
+
     canvas.addEventListener('click', function(e) {
       if (activeOverlay) return;
       var rect = canvas.getBoundingClientRect();
-      var hit = getStationAtScreen(e.clientX - rect.left, e.clientY - rect.top);
+      var sx = e.clientX - rect.left;
+      var sy = e.clientY - rect.top;
+      var npcHit = getNPCAtScreen(sx, sy);
+      if (npcHit) {
+        openNPCChat(npcHit);
+        return;
+      }
+      var hit = getStationAtScreen(sx, sy);
       if (hit) {
         openOverlay(hit.id);
       }
@@ -3754,13 +4084,35 @@
     var hoveredStation = null;
     canvas.addEventListener('mousemove', function(e) {
       var rect = canvas.getBoundingClientRect();
-      var hit = getStationAtScreen(e.clientX - rect.left, e.clientY - rect.top);
+      var sx = e.clientX - rect.left;
+      var sy = e.clientY - rect.top;
       var tooltip = document.getElementById('stationTooltip');
+
+      var npcHit = getNPCAtScreen(sx, sy);
+      if (npcHit) {
+        canvas.style.cursor = 'pointer';
+        var nameEl = document.getElementById('tooltipName');
+        clearChildren(nameEl);
+        var dot = document.createElement('span');
+        dot.className = 'status-dot';
+        dot.style.width = '6px';
+        dot.style.height = '6px';
+        dot.style.borderRadius = '50%';
+        dot.style.display = 'inline-block';
+        dot.style.background = npcHit.status === 'online' ? '#00ff88' : npcHit.status === 'scheduled' ? '#fdcb6e' : '#888';
+        nameEl.appendChild(dot);
+        nameEl.appendChild(document.createTextNode(' ' + npcHit.emoji + ' ' + npcHit.name));
+        document.getElementById('tooltipStats').textContent = npcHit.role + ' \u2022 ' + (npcHit.statusText || npcHit.status);
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top = (e.clientY + 14) + 'px';
+        tooltip.classList.add('visible');
+        return;
+      }
+
+      var hit = getStationAtScreen(sx, sy);
       if (hit) {
         canvas.style.cursor = 'pointer';
         hoveredStation = hit;
-        // Position and populate tooltip
-        var stats = getStationQuickStats(hit);
         var nameEl = document.getElementById('tooltipName');
         clearChildren(nameEl);
         var dot = document.createElement('span');
@@ -3772,7 +4124,7 @@
         dot.style.background = hit.getStatusColor();
         nameEl.appendChild(dot);
         nameEl.appendChild(document.createTextNode(' ' + hit.emoji + ' ' + hit.label));
-        document.getElementById('tooltipStats').textContent = stats || hit.getSubInfo();
+        document.getElementById('tooltipStats').textContent = getStationQuickStats(hit) || hit.getSubInfo();
         tooltip.style.left = (e.clientX + 14) + 'px';
         tooltip.style.top = (e.clientY + 14) + 'px';
         tooltip.classList.add('visible');
