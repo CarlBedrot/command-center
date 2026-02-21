@@ -1346,12 +1346,73 @@
     var eventQueue = [];
     var previousState = null;
     var activityFeed = [];
+    var npcCharacters = [];
+    var nearestNPC = null;
+    var activeNPCChat = null;
 
     // Pre-rendered floor
     var floorCanvas = document.createElement('canvas');
     floorCanvas.width = WORLD_W;
     floorCanvas.height = WORLD_H;
     var floorCtx = floorCanvas.getContext('2d');
+
+    // ═══════════════════════════════════════════
+    // NPC CHARACTERS
+    // ═══════════════════════════════════════════
+    var NPC_POSITIONS = {
+      'jarvis': { cx: 1120, cy: 780 },
+      'coach':  { cx: 1950, cy: 420 },
+      'budget': { cx: 2110, cy: 420 },
+      'hunter': { cx: 2030, cy: 620 },
+      'scout':  { cx: 1110, cy: 260 },
+      'lender': { cx: 450, cy: 1030 }
+    };
+
+    var NPC_COLORS = {
+      'jarvis': '#00d4ff',
+      'budget': '#fdcb6e',
+      'hunter': '#00b894',
+      'lender': '#a29bfe',
+      'scout':  '#fd79a8',
+      'coach':  '#e17055'
+    };
+
+    var NPC_SIZE = 24;
+    var NPC_INTERACT_RADIUS = 80;
+
+    function buildNPCCharacters() {
+      var agents = agentsData && (agentsData.agents || agentsData);
+      if (!agents) return;
+      if (!Array.isArray(agents)) {
+        agents = Object.keys(agents).map(function(k) {
+          var a = agents[k];
+          if (typeof a === 'object') { a.id = a.id || k; return a; }
+          return { id: k, name: k };
+        });
+      }
+
+      npcCharacters = [];
+      agents.forEach(function(agent, idx) {
+        var id = agent.id || agent.name || '?';
+        var pos = NPC_POSITIONS[id.toLowerCase()];
+        if (!pos) {
+          pos = { cx: 800 + idx * 120, cy: 900 };
+        }
+        npcCharacters.push({
+          id: id,
+          name: agent.name || id,
+          role: agent.role || '',
+          emoji: agent.emoji || '\u{1F916}',
+          status: agent.status || 'idle',
+          statusText: agent.statusText || '',
+          color: NPC_COLORS[id.toLowerCase()] || '#888',
+          cx: pos.cx,
+          cy: pos.cy,
+          sessionKey: agent.sessionKey || id,
+          bobPhase: Math.random() * Math.PI * 2
+        });
+      });
+    }
 
     // ═══════════════════════════════════════════
     // localStorage CHAT HISTORY
@@ -1500,6 +1561,7 @@
       try {
         agentsData = await api('/api/agents');
         renderAgentsGrid();
+        buildNPCCharacters();
       } catch (e) {
         var grid = document.getElementById('agentsGrid');
         if (grid) {
@@ -1538,7 +1600,7 @@
     async function refreshAll(silent) {
       isFetching = true;
       updateRefreshBar();
-      await Promise.all([fetchStatus(), fetchHealth(), fetchCron(), fetchSessions()]);
+      await Promise.all([fetchStatus(), fetchHealth(), fetchCron(), fetchSessions(), fetchAgents()]);
       lastRefreshAt = Date.now();
       isFetching = false;
       updateRefreshBar();
@@ -3235,6 +3297,65 @@
     }
 
     // ═══════════════════════════════════════════
+    // NPC RENDERING
+    // ═══════════════════════════════════════════
+    function renderNPCs(ctx) {
+      for (var i = 0; i < npcCharacters.length; i++) {
+        var npc = npcCharacters[i];
+        var isNear = nearestNPC === npc && !activeOverlay;
+        var bob = Math.sin(animTimer * 1.5 + npc.bobPhase) * 3;
+
+        ctx.save();
+
+        // Glow circle base
+        var glowGrad = ctx.createRadialGradient(npc.cx, npc.cy + bob, 0, npc.cx, npc.cy + bob, NPC_SIZE + 12);
+        glowGrad.addColorStop(0, npc.color + (isNear ? '40' : '20'));
+        glowGrad.addColorStop(1, npc.color + '00');
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(npc.cx, npc.cy + bob, NPC_SIZE + 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Solid circle base
+        ctx.beginPath();
+        ctx.arc(npc.cx, npc.cy + bob, NPC_SIZE, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(18,18,31,0.85)';
+        ctx.fill();
+        ctx.strokeStyle = isNear ? npc.color : 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = isNear ? 2.5 : 1.5;
+        ctx.stroke();
+
+        // Emoji face
+        ctx.font = '28px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(npc.emoji, npc.cx, npc.cy + bob - 2);
+
+        // Name tag above
+        ctx.font = '600 11px "SF Pro Display", -apple-system, sans-serif';
+        ctx.fillStyle = isNear ? '#fff' : '#ccc';
+        ctx.fillText(npc.name, npc.cx, npc.cy + bob - NPC_SIZE - 10);
+
+        // Role below
+        ctx.font = '10px "SF Pro Display", -apple-system, sans-serif';
+        ctx.fillStyle = '#888';
+        ctx.fillText(npc.role, npc.cx, npc.cy + bob + NPC_SIZE + 14);
+
+        // Status dot
+        var statusColor = npc.status === 'online' ? '#00ff88' : npc.status === 'scheduled' ? '#fdcb6e' : npc.status === 'idle' ? '#888' : '#ff4757';
+        ctx.beginPath();
+        ctx.arc(npc.cx + NPC_SIZE - 4, npc.cy + bob - NPC_SIZE + 4, 4, 0, Math.PI * 2);
+        ctx.fillStyle = statusColor;
+        ctx.fill();
+        ctx.strokeStyle = '#12121f';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    }
+
+    // ═══════════════════════════════════════════
     // PLAYER RENDERING
     // ═══════════════════════════════════════════
     function renderPlayer(ctx, px, py) {
@@ -3489,6 +3610,9 @@
 
       // Stations
       renderStations(ctx);
+
+      // NPC Characters
+      renderNPCs(ctx);
 
       // Player trail
       for (var ti = 0; ti < playerTrail.length; ti++) {
