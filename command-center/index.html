@@ -1452,16 +1452,8 @@
     var NPC_SIZE = 24;
     var NPC_INTERACT_RADIUS = 80;
 
-    function buildNPCCharacters() {
-      var agents = agentsData && (agentsData.agents || agentsData);
-      if (!agents) return;
-      if (!Array.isArray(agents)) {
-        agents = Object.keys(agents).map(function(k) {
-          var a = agents[k];
-          if (typeof a === 'object') { a.id = a.id || k; return a; }
-          return { id: k, name: k };
-        });
-      }
+    function buildNPCCharacters(agents) {
+      if (!agents || !Array.isArray(agents) || agents.length === 0) return;
 
       npcCharacters = [];
       agents.forEach(function(agent, idx) {
@@ -1633,13 +1625,26 @@
       try {
         agentsData = await api('/api/agents');
         renderAgentsGrid();
-        buildNPCCharacters();
       } catch (e) {
         var grid = document.getElementById('agentsGrid');
         if (grid) {
           clearChildren(grid);
           grid.appendChild(buildErrorState('Failed to load agents', fetchAgents));
         }
+      }
+    }
+
+    var npcDataLoaded = false;
+    async function fetchNPCData() {
+      if (npcDataLoaded) return;
+      try {
+        var data = await api('/agents.json');
+        if (data && data.agents) {
+          buildNPCCharacters(data.agents);
+          npcDataLoaded = true;
+        }
+      } catch (e) {
+        // Silently retry on next refresh
       }
     }
 
@@ -1672,7 +1677,7 @@
     async function refreshAll(silent) {
       isFetching = true;
       updateRefreshBar();
-      await Promise.all([fetchStatus(), fetchHealth(), fetchCron(), fetchSessions(), fetchAgents()]);
+      await Promise.all([fetchStatus(), fetchHealth(), fetchCron(), fetchSessions(), fetchAgents(), fetchNPCData()]);
       lastRefreshAt = Date.now();
       isFetching = false;
       updateRefreshBar();
