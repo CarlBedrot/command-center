@@ -152,7 +152,6 @@
 
     /* ── Station Overlays ── */
     .station-overlay {
-      display: none;
       position: fixed;
       top: 0;
       left: 0;
@@ -161,13 +160,29 @@
       background: rgba(0,0,0,0.75);
       backdrop-filter: blur(4px);
       z-index: 500;
+      display: flex;
       align-items: flex-start;
       justify-content: center;
       overflow-y: auto;
       padding: 40px 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
     }
 
-    .station-overlay.active { display: flex; }
+    .station-overlay .overlay-panel {
+      transform: translateY(12px);
+      transition: transform 0.25s ease;
+    }
+
+    .station-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .station-overlay.active .overlay-panel {
+      transform: translateY(0);
+    }
 
     .overlay-panel {
       background: #12121f;
@@ -898,6 +913,64 @@
 
     .hidden { display: none !important; }
 
+    /* ── Activity Feed ── */
+    .activity-feed {
+      position: absolute;
+      bottom: 60px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      pointer-events: none;
+    }
+
+    .feed-item {
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      border-left: 2px solid;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+      max-width: 280px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .feed-item.fading { opacity: 0; }
+
+    /* ── Station Tooltip ── */
+    #stationTooltip {
+      position: fixed;
+      z-index: 200;
+      background: rgba(12,12,20,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 8px 12px;
+      pointer-events: none;
+      display: none;
+      font-size: 0.75rem;
+      backdrop-filter: blur(6px);
+      max-width: 220px;
+    }
+
+    #stationTooltip.visible { display: block; }
+
+    .tooltip-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tooltip-stat {
+      color: #888;
+      font-size: 0.7rem;
+    }
+
     /* ── Responsive ── */
     @media (max-width: 600px) {
       .chat-overlay { width: 100% !important; }
@@ -933,6 +1006,7 @@
     <div class="hud-top-right">
       <div class="hud-info" id="modelInfo">Model: ...</div>
       <div class="hud-info"><span id="sessionCount">-</span> Sessions &middot; <span id="cronCount">-</span> Cron</div>
+      <div class="hud-info" id="cronCountdown" style="color:#fdcb6e"></div>
     </div>
 
     <div class="hud-bottom-center">
@@ -944,7 +1018,7 @@
         <div class="refresh-spinner"></div>
         <span id="refreshText">Loading...</span>
       </div>
-      <div class="hud-hints">WASD: Move &middot; E: Interact &middot; M: Message &middot; Esc: Close</div>
+      <div class="hud-hints">WASD: Move &middot; E: Interact &middot; 1-7: Stations &middot; M: Message &middot; Esc: Close</div>
     </div>
 
     <div class="hud-bottom-right">
@@ -1100,6 +1174,8 @@
     </div>
   </div>
 
+  <div class="activity-feed" id="activityFeed"></div>
+  <div id="stationTooltip"><div class="tooltip-name" id="tooltipName"></div><div class="tooltip-stat" id="tooltipStats"></div></div>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -1266,6 +1342,10 @@
     var particles = [];
     var lastTime = 0;
     var accumulator = 0;
+    var playerTrail = [];
+    var eventQueue = [];
+    var previousState = null;
+    var activityFeed = [];
 
     // Pre-rendered floor
     var floorCanvas = document.createElement('canvas');
@@ -1463,6 +1543,7 @@
       isFetching = false;
       updateRefreshBar();
       renderHealthBanner();
+      detectEvents();
       if (!silent) toast('Refreshed');
     }
 
@@ -2370,6 +2451,202 @@
     }
 
     // ═══════════════════════════════════════════
+    // EVENT NOTIFICATION SYSTEM
+    // ═══════════════════════════════════════════
+    function snapshotState() {
+      return {
+        sessionCount: sessionsData ? (sessionsData.count || 0) : 0,
+        sessionKeys: sessionsData && sessionsData.sessions ? sessionsData.sessions.map(function(s) { return s.key; }) : [],
+        cronStatuses: cronData && cronData.jobs ? cronData.jobs.map(function(j) { return { id: j.id, name: j.name, lastStatus: j.state && j.state.lastStatus }; }) : [],
+        gatewayLatency: statusData && statusData.gateway ? statusData.gateway.connectLatencyMs : 0,
+        gatewayReachable: statusData && statusData.gateway ? statusData.gateway.reachable : false,
+        tgOk: healthData && healthData.channels && healthData.channels.telegram && healthData.channels.telegram.probe ? healthData.channels.telegram.probe.ok : null,
+        waLinked: healthData && healthData.channels && healthData.channels.whatsapp ? healthData.channels.whatsapp.linked : null,
+        tokenWarnings: sessionsData && sessionsData.sessions ? sessionsData.sessions.filter(function(s) {
+          return s.totalTokens && s.contextTokens && Math.round((s.totalTokens / s.contextTokens) * 100) >= 70;
+        }).map(function(s) { return { key: s.key, pct: Math.round((s.totalTokens / s.contextTokens) * 100) }; }) : []
+      };
+    }
+
+    function detectEvents() {
+      if (!previousState) {
+        previousState = snapshotState();
+        return;
+      }
+
+      var current = snapshotState();
+      var events = [];
+
+      // New sessions
+      current.sessionKeys.forEach(function(k) {
+        if (previousState.sessionKeys.indexOf(k) === -1) {
+          var label = k.split(':').pop() || k;
+          events.push({ msg: 'New session: ' + label, station: 'sessions', color: '#a29bfe' });
+        }
+      });
+
+      // Cron status changes
+      current.cronStatuses.forEach(function(c) {
+        var prev = previousState.cronStatuses.find(function(p) { return p.id === c.id; });
+        if (prev && prev.lastStatus !== c.lastStatus && c.lastStatus) {
+          events.push({ msg: c.name + ': ' + c.lastStatus, station: 'cron', color: '#fdcb6e' });
+        }
+      });
+
+      // Gateway latency spike
+      if (current.gatewayLatency > 500 && previousState.gatewayLatency <= 500) {
+        events.push({ msg: 'Gateway: ' + current.gatewayLatency + 'ms', station: 'gateway', color: '#ff6b6b' });
+      }
+
+      // Gateway went down/up
+      if (current.gatewayReachable !== previousState.gatewayReachable) {
+        events.push({ msg: 'Gateway: ' + (current.gatewayReachable ? 'ONLINE' : 'DOWN'), station: 'gateway', color: current.gatewayReachable ? '#00ff88' : '#ff4757' });
+      }
+
+      // Channel changes
+      if (current.tgOk !== null && previousState.tgOk !== null && current.tgOk !== previousState.tgOk) {
+        events.push({ msg: 'Telegram: ' + (current.tgOk ? 'UP' : 'DOWN'), station: 'comms', color: current.tgOk ? '#00ff88' : '#ff4757' });
+      }
+      if (current.waLinked !== null && previousState.waLinked !== null && current.waLinked !== previousState.waLinked) {
+        events.push({ msg: 'WhatsApp: ' + (current.waLinked ? 'Linked' : 'DOWN'), station: 'comms', color: current.waLinked ? '#00ff88' : '#ff4757' });
+      }
+
+      // Token warnings
+      current.tokenWarnings.forEach(function(w) {
+        var prevW = previousState.tokenWarnings.find(function(p) { return p.key === w.key; });
+        if (!prevW || (w.pct >= 80 && (!prevW || prevW.pct < 80))) {
+          var name = w.key.split(':').pop() || w.key;
+          events.push({ msg: name + ' at ' + w.pct + '% context', station: 'sessions', color: '#ffcc00' });
+        }
+      });
+
+      // Add to event queue with position
+      events.forEach(function(ev) {
+        var station = stations.find(function(s) { return s.id === ev.station; });
+        if (station) {
+          eventQueue.push({
+            msg: ev.msg,
+            color: ev.color,
+            x: station.cx,
+            y: station.y - 10,
+            alpha: 1.0,
+            life: 4.0
+          });
+          activityFeed.unshift({ msg: ev.msg, color: ev.color, ts: Date.now() });
+          if (activityFeed.length > 5) activityFeed.pop();
+        }
+      });
+
+      previousState = current;
+    }
+
+    function updateNotifications(dt) {
+      for (var i = eventQueue.length - 1; i >= 0; i--) {
+        var n = eventQueue[i];
+        n.y -= 25 * dt;
+        n.life -= dt;
+        n.alpha = Math.max(0, n.life / 4.0);
+        if (n.life <= 0) eventQueue.splice(i, 1);
+      }
+    }
+
+    function renderNotifications(ctx) {
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (var i = 0; i < eventQueue.length; i++) {
+        var n = eventQueue[i];
+        ctx.font = '600 11px "SF Pro Display", -apple-system, sans-serif';
+        var tw = ctx.measureText(n.msg).width;
+        var pw = tw + 16;
+        var ph = 22;
+        var px = n.x - pw / 2;
+
+        ctx.globalAlpha = n.alpha * 0.8;
+        roundRect(ctx, px, n.y - ph / 2, pw, ph, 11);
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fill();
+        ctx.strokeStyle = n.color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.globalAlpha = n.alpha;
+        ctx.fillStyle = n.color;
+        ctx.fillText(n.msg, n.x, n.y);
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // ═══════════════════════════════════════════
+    // STATION QUICK STATS (floating labels)
+    // ═══════════════════════════════════════════
+    function getStationQuickStats(station) {
+      switch (station.id) {
+        case 'sessions':
+          if (!sessionsData || !sessionsData.sessions) return null;
+          var activeSessions = sessionsData.sessions.filter(function(s) {
+            return (s.ageMs || 0) / 3600000 < 168;
+          });
+          var maxCtx = 0;
+          activeSessions.forEach(function(s) {
+            if (s.totalTokens && s.contextTokens) {
+              var pct = Math.round((s.totalTokens / s.contextTokens) * 100);
+              if (pct > maxCtx) maxCtx = pct;
+            }
+          });
+          return activeSessions.length + ' active | ' + maxCtx + '% max ctx';
+        case 'cron':
+          if (!cronData || !cronData.jobs || !cronData.jobs.length) return null;
+          var nextJob = null;
+          var nextMs = Infinity;
+          cronData.jobs.forEach(function(j) {
+            if (j.enabled && j.state && j.state.nextRunAtMs && j.state.nextRunAtMs < nextMs) {
+              nextMs = j.state.nextRunAtMs;
+              nextJob = j;
+            }
+          });
+          if (!nextJob) return 'No upcoming jobs';
+          return 'Next: ' + nextJob.name + ' ' + formatRelativeTime(nextMs);
+        case 'gateway':
+          if (!statusData || !statusData.gateway) return null;
+          var gw = statusData.gateway;
+          var agentCount = (statusData.agents && statusData.agents.agents) ? statusData.agents.agents.length : 0;
+          return (gw.reachable ? gw.connectLatencyMs + 'ms' : 'DOWN') + ' | ' + agentCount + ' agents';
+        case 'logs':
+          if (!logsData) return null;
+          var entries = logsData.entries || logsData.logs || logsData;
+          if (!Array.isArray(entries)) return null;
+          var errs = 0, warns = 0;
+          entries.forEach(function(e) {
+            var lvl = (e.level || e.severity || '').toLowerCase();
+            if (lvl === 'error' || lvl === 'critical') errs++;
+            else if (lvl === 'warn' || lvl === 'warning') warns++;
+          });
+          return errs + ' errors | ' + warns + ' warnings';
+        case 'comms':
+          if (!healthData || !healthData.channels) return null;
+          var ch = healthData.channels;
+          var tgOk = ch.telegram && ch.telegram.probe && ch.telegram.probe.ok;
+          var waOk = ch.whatsapp && ch.whatsapp.linked;
+          return 'TG: ' + (tgOk ? 'OK' : 'Down') + ' | WA: ' + (waOk ? 'Linked' : 'Down');
+        case 'agents':
+          if (!agentsData) return null;
+          var agents = agentsData.agents || agentsData;
+          var count = Array.isArray(agents) ? agents.length : Object.keys(agents).length;
+          return count + ' configured';
+        case 'skills':
+          if (!skillsData) return null;
+          var skills = skillsData.skills || skillsData;
+          var arr = Array.isArray(skills) ? skills : Object.values(skills);
+          var eligible = arr.filter(function(sk) { return sk.eligible !== false; }).length;
+          return eligible + ' eligible';
+        default:
+          return null;
+      }
+    }
+
+    // ═══════════════════════════════════════════
     // CANVAS SETUP
     // ═══════════════════════════════════════════
     var canvas = document.getElementById('gameCanvas');
@@ -2406,6 +2683,30 @@
         floorCtx.stroke();
       }
 
+      // Connection traces between related stations (circuit-board style)
+      var connections = [
+        ['gateway', 'sessions'], ['gateway', 'cron'], ['gateway', 'comms'],
+        ['gateway', 'logs'], ['sessions', 'agents'], ['cron', 'skills']
+      ];
+
+      floorCtx.strokeStyle = 'rgba(0,212,255,0.04)';
+      floorCtx.lineWidth = 1;
+      floorCtx.setLineDash([8, 12]);
+      connections.forEach(function(pair) {
+        var a = stations.find(function(s) { return s.id === pair[0]; });
+        var b = stations.find(function(s) { return s.id === pair[1]; });
+        if (!a || !b) return;
+        // L-shaped trace: go horizontal first, then vertical
+        var midX = (a.cx + b.cx) / 2;
+        floorCtx.beginPath();
+        floorCtx.moveTo(a.cx, a.cy);
+        floorCtx.lineTo(midX, a.cy);
+        floorCtx.lineTo(midX, b.cy);
+        floorCtx.lineTo(b.cx, b.cy);
+        floorCtx.stroke();
+      });
+      floorCtx.setLineDash([]);
+
       // Radial vignette
       var grad = floorCtx.createRadialGradient(WORLD_W / 2, WORLD_H / 2, 200, WORLD_W / 2, WORLD_H / 2, WORLD_W * 0.55);
       grad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -2415,6 +2716,71 @@
     }
 
     prerenderFloor();
+
+    // Data packet animation along connection lines
+    var dataPackets = [];
+    var connectionDefs = [
+      ['gateway', 'sessions'], ['gateway', 'cron'], ['gateway', 'comms'],
+      ['gateway', 'logs'], ['sessions', 'agents'], ['cron', 'skills']
+    ];
+
+    function spawnDataPacket() {
+      var conn = connectionDefs[Math.floor(Math.random() * connectionDefs.length)];
+      var a = stations.find(function(s) { return s.id === conn[0]; });
+      var b = stations.find(function(s) { return s.id === conn[1]; });
+      if (!a || !b) return;
+      var midX = (a.cx + b.cx) / 2;
+      // Path segments: a→mid horizontal, mid vertical, mid→b horizontal
+      var reverse = Math.random() > 0.5;
+      var from = reverse ? b : a;
+      var to = reverse ? a : b;
+      dataPackets.push({
+        segments: [
+          { x0: from.cx, y0: from.cy, x1: midX, y1: from.cy },
+          { x0: midX, y0: from.cy, x1: midX, y1: to.cy },
+          { x0: midX, y0: to.cy, x1: to.cx, y1: to.cy }
+        ],
+        seg: 0, t: 0, speed: 0.6 + Math.random() * 0.4
+      });
+    }
+
+    function updateDataPackets(dt) {
+      // Spawn occasionally
+      if (Math.random() < dt * 0.5 && dataPackets.length < 8) {
+        spawnDataPacket();
+      }
+      for (var i = dataPackets.length - 1; i >= 0; i--) {
+        var p = dataPackets[i];
+        p.t += p.speed * dt;
+        if (p.t >= 1) {
+          p.t = 0;
+          p.seg++;
+          if (p.seg >= p.segments.length) {
+            dataPackets.splice(i, 1);
+          }
+        }
+      }
+    }
+
+    function renderDataPackets(ctx) {
+      ctx.save();
+      for (var i = 0; i < dataPackets.length; i++) {
+        var p = dataPackets[i];
+        if (p.seg >= p.segments.length) continue;
+        var seg = p.segments[p.seg];
+        var x = seg.x0 + (seg.x1 - seg.x0) * p.t;
+        var y = seg.y0 + (seg.y1 - seg.y0) * p.t;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,212,255,0.5)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fill();
+      }
+      ctx.restore();
+    }
 
     // ═══════════════════════════════════════════
     // PARTICLES
@@ -2454,6 +2820,167 @@
         ctx.fillRect(p.x, p.y, p.size, p.size);
       }
     }
+
+    // ═══════════════════════════════════════════
+    // STATION ACTIVITY PARTICLES
+    // ═══════════════════════════════════════════
+    function initStationParticles() {
+      stations.forEach(function(s) {
+        s._particles = [];
+      });
+    }
+
+    function updateStationParticles(dt) {
+      for (var i = 0; i < stations.length; i++) {
+        var s = stations[i];
+        if (!s._particles) s._particles = [];
+
+        switch (s.id) {
+          case 'sessions':
+            // Orbiting dots, count = active sessions
+            var activeCount = 0;
+            if (sessionsData && sessionsData.sessions) {
+              activeCount = sessionsData.sessions.filter(function(sess) {
+                return (sess.ageMs || 0) / 3600000 < 168;
+              }).length;
+            }
+            var sessClamped = Math.min(activeCount, 8);
+            while (s._particles.length < sessClamped) s._particles.push({ angle: Math.random() * Math.PI * 2, speed: 0.8 + Math.random() * 0.4, dist: 0, size: 2.5, alpha: 0.7 });
+            while (s._particles.length > sessClamped) s._particles.pop();
+            var colors = ['rgba(108,92,231,', 'rgba(225,112,85,', 'rgba(0,206,209,'];
+            for (var j = 0; j < s._particles.length; j++) {
+              var sp = s._particles[j];
+              sp.angle += sp.speed * dt;
+              sp.dist = (s.w / 2) + 20 + Math.sin(animTimer + j) * 6;
+              sp.x = s.cx + Math.cos(sp.angle) * sp.dist;
+              sp.y = s.cy + Math.sin(sp.angle) * sp.dist * 0.6;
+              sp.color = colors[j % 3] + sp.alpha + ')';
+            }
+            break;
+
+          case 'cron':
+            // Clockwise arc particles, pulse faster when next job <5min
+            var nextInMs = Infinity;
+            if (cronData && cronData.jobs) {
+              cronData.jobs.forEach(function(j) {
+                if (j.enabled && j.state && j.state.nextRunAtMs) {
+                  var diff = j.state.nextRunAtMs - Date.now();
+                  if (diff > 0 && diff < nextInMs) nextInMs = diff;
+                }
+              });
+            }
+            var cronSpeed = nextInMs < 300000 ? 2.5 : 1.0;
+            while (s._particles.length < 4) s._particles.push({ angle: s._particles.length * (Math.PI / 2), speed: 0, size: 2, alpha: 0.5 });
+            for (var j = 0; j < s._particles.length; j++) {
+              var sp = s._particles[j];
+              sp.angle += cronSpeed * dt;
+              var arcDist = (s.w / 2) + 15;
+              sp.x = s.cx + Math.cos(sp.angle) * arcDist;
+              sp.y = s.cy + Math.sin(sp.angle) * arcDist * 0.55;
+              sp.color = 'rgba(225,112,85,' + (0.3 + Math.sin(animTimer * cronSpeed + j) * 0.2) + ')';
+              sp.alpha = 1;
+            }
+            break;
+
+          case 'gateway':
+            // Enhanced rings already exist; add speed-dependent rotation dots
+            var latency = (statusData && statusData.gateway && statusData.gateway.connectLatencyMs) || 100;
+            var ringSpeed = Math.max(0.5, 3 - latency / 100);
+            var ringColor = latency > 500 ? '255,71,87' : '0,212,255';
+            while (s._particles.length < 3) s._particles.push({ angle: s._particles.length * (Math.PI * 2 / 3), size: 3, alpha: 0.6 });
+            for (var j = 0; j < s._particles.length; j++) {
+              var sp = s._particles[j];
+              sp.angle += ringSpeed * dt;
+              var rDist = 50 + j * 22;
+              sp.x = s.cx + Math.cos(sp.angle) * rDist;
+              sp.y = s.cy + Math.sin(sp.angle) * rDist;
+              sp.color = 'rgba(' + ringColor + ',' + sp.alpha + ')';
+            }
+            break;
+
+          case 'agents':
+            // One orbiting dot per agent
+            var agentArr = agentsData ? (agentsData.agents || agentsData) : [];
+            if (!Array.isArray(agentArr)) agentArr = Object.values(agentArr);
+            var agentClamped = Math.min(agentArr.length, 6);
+            while (s._particles.length < agentClamped) s._particles.push({ angle: Math.random() * Math.PI * 2, speed: 0.6 + Math.random() * 0.3, size: 2.5, alpha: 0.6 });
+            while (s._particles.length > agentClamped) s._particles.pop();
+            for (var j = 0; j < s._particles.length; j++) {
+              var sp = s._particles[j];
+              sp.angle += sp.speed * dt;
+              var aDist = (s.w / 2) + 18;
+              sp.x = s.cx + Math.cos(sp.angle) * aDist;
+              sp.y = s.cy + Math.sin(sp.angle) * aDist * 0.55;
+              sp.color = 'rgba(9,132,227,' + sp.alpha + ')';
+            }
+            break;
+
+          case 'logs':
+            // Particles drift upward, red for errors, yellow for warnings
+            if (s._particles.length < 6) {
+              s._particles.push({
+                x: s.cx + (Math.random() - 0.5) * s.w * 0.6,
+                y: s.y + s.h,
+                vy: -15 - Math.random() * 10,
+                size: 1.5 + Math.random(),
+                alpha: 0.6,
+                isError: Math.random() < 0.3
+              });
+            }
+            for (var j = s._particles.length - 1; j >= 0; j--) {
+              var sp = s._particles[j];
+              sp.y += sp.vy * dt;
+              sp.alpha -= 0.4 * dt;
+              sp.color = sp.isError ? 'rgba(255,107,107,' + Math.max(0, sp.alpha) + ')' : 'rgba(255,221,87,' + Math.max(0, sp.alpha) + ')';
+              if (sp.alpha <= 0 || sp.y < s.y - 30) {
+                s._particles.splice(j, 1);
+              }
+            }
+            break;
+
+          case 'skills':
+            // Twinkle/sparkle particles
+            if (s._particles.length < 5) {
+              s._particles.push({
+                x: s.cx + (Math.random() - 0.5) * s.w,
+                y: s.cy + (Math.random() - 0.5) * s.h,
+                size: 1 + Math.random() * 1.5,
+                alpha: 0,
+                phase: Math.random() * Math.PI * 2,
+                speed: 1.5 + Math.random()
+              });
+            }
+            for (var j = 0; j < s._particles.length; j++) {
+              var sp = s._particles[j];
+              sp.phase += sp.speed * dt;
+              sp.alpha = Math.max(0, Math.sin(sp.phase) * 0.6);
+              sp.color = 'rgba(85,239,196,' + sp.alpha + ')';
+              if (sp.phase > Math.PI * 2) {
+                sp.x = s.cx + (Math.random() - 0.5) * s.w;
+                sp.y = s.cy + (Math.random() - 0.5) * s.h;
+                sp.phase = 0;
+              }
+            }
+            break;
+
+          case 'comms':
+            // Two satellite dots orbiting opposite directions
+            while (s._particles.length < 2) s._particles.push({ angle: s._particles.length * Math.PI, size: 2.5, alpha: 0.6 });
+            for (var j = 0; j < s._particles.length; j++) {
+              var sp = s._particles[j];
+              var dir = j === 0 ? 1 : -1;
+              sp.angle += dir * 1.2 * dt;
+              var cDist = (s.w / 2) + 16;
+              sp.x = s.cx + Math.cos(sp.angle) * cDist;
+              sp.y = s.cy + Math.sin(sp.angle) * cDist * 0.5;
+              sp.color = j === 0 ? 'rgba(0,184,148,' + sp.alpha + ')' : 'rgba(0,206,201,' + sp.alpha + ')';
+            }
+            break;
+        }
+      }
+    }
+
+    initStationParticles();
 
     // ═══════════════════════════════════════════
     // COLLISION DETECTION
@@ -2577,6 +3104,27 @@
 
         ctx.save();
 
+        // Urgency glow — persistent radial glow based on health
+        var glowColor, glowAlpha, glowRadius;
+        if (statusColor === '#ff4757') {
+          glowColor = '255,71,87';
+          glowAlpha = 0.12 + Math.sin(animTimer * 4) * 0.06;
+          glowRadius = s.w * 0.9 + Math.sin(animTimer * 4) * 8;
+        } else if (statusColor === '#ffcc00') {
+          glowColor = '255,204,0';
+          glowAlpha = 0.08 + Math.sin(animTimer * 2.5) * 0.03;
+          glowRadius = s.w * 0.8 + Math.sin(animTimer * 2.5) * 5;
+        } else {
+          glowColor = '0,255,136';
+          glowAlpha = 0.04;
+          glowRadius = s.w * 0.7;
+        }
+        var urgGrad = ctx.createRadialGradient(s.cx, s.cy, 0, s.cx, s.cy, glowRadius);
+        urgGrad.addColorStop(0, 'rgba(' + glowColor + ',' + glowAlpha + ')');
+        urgGrad.addColorStop(1, 'rgba(' + glowColor + ',0)');
+        ctx.fillStyle = urgGrad;
+        ctx.fillRect(s.cx - glowRadius, s.cy - glowRadius, glowRadius * 2, glowRadius * 2);
+
         // Glow when player is near
         if (isNear) {
           ctx.shadowColor = s.colorPrimary;
@@ -2639,6 +3187,42 @@
         ctx.font = '11px "SF Pro Display", -apple-system, sans-serif';
         ctx.fillStyle = '#888';
         ctx.fillText(subInfo, s.cx, s.y + s.h - 14);
+
+        // Floating data label pill below station
+        var quickStats = getStationQuickStats(s);
+        if (quickStats) {
+          ctx.font = '10px "SF Pro Display", -apple-system, sans-serif';
+          var tw = ctx.measureText(quickStats).width;
+          var pillW = tw + 16;
+          var pillH = 20;
+          var pillX = s.cx - pillW / 2;
+          var pillY = s.y + s.h + 8;
+
+          roundRect(ctx, pillX, pillY, pillW, pillH, 10);
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+
+          ctx.fillStyle = '#aaa';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(quickStats, s.cx, pillY + pillH / 2);
+        }
+
+        // Station activity particles
+        if (s._particles) {
+          for (var pi = 0; pi < s._particles.length; pi++) {
+            var sp = s._particles[pi];
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+            ctx.fillStyle = sp.color;
+            ctx.globalAlpha = sp.alpha;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+        }
 
         ctx.restore();
       }
@@ -2703,16 +3287,58 @@
     function updateHUD() {
       var prompt = document.getElementById('interactPrompt');
       if (nearestStation && !activeOverlay) {
-        prompt.textContent = 'Press E \u2014 ' + nearestStation.emoji + ' ' + nearestStation.label;
+        var stats = getStationQuickStats(nearestStation);
+        var lines = 'Press E \u2014 ' + nearestStation.emoji + ' ' + nearestStation.label;
+        if (stats) lines += '\n' + stats;
+        prompt.textContent = lines;
+        prompt.style.whiteSpace = 'pre-line';
+        prompt.style.borderColor = nearestStation.colorPrimary;
+        prompt.style.borderWidth = '1.5px';
         prompt.classList.add('visible');
       } else {
         prompt.classList.remove('visible');
+        prompt.style.borderColor = '';
+        prompt.style.borderWidth = '';
       }
     }
 
     // ═══════════════════════════════════════════
     // MINIMAP
     // ═══════════════════════════════════════════
+    function renderActivityFeed() {
+      var container = document.getElementById('activityFeed');
+      if (!container) return;
+
+      // Remove old items (>30s)
+      var now = Date.now();
+      for (var i = activityFeed.length - 1; i >= 0; i--) {
+        if (now - activityFeed[i].ts > 30000) {
+          activityFeed.splice(i, 1);
+        }
+      }
+
+      // Sync DOM
+      while (container.children.length > activityFeed.length) {
+        container.removeChild(container.lastChild);
+      }
+      for (var i = 0; i < activityFeed.length; i++) {
+        var item = activityFeed[i];
+        var el = container.children[i];
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'feed-item';
+          container.appendChild(el);
+        }
+        el.textContent = item.msg;
+        el.style.color = item.color;
+        el.style.borderLeftColor = item.color;
+        // Fade out in last 5 seconds
+        if (now - item.ts > 25000) {
+          el.classList.add('fading');
+        }
+      }
+    }
+
     function renderMinimap() {
       var mc = document.getElementById('minimapCanvas');
       var mctx = mc.getContext('2d');
@@ -2775,6 +3401,7 @@
         player.moving = false;
         updateCamera(dt);
         updateParticles(dt);
+        updateStationParticles(dt);
         return;
       }
 
@@ -2815,6 +3442,22 @@
 
       // Particles
       updateParticles(dt);
+      updateStationParticles(dt);
+
+      // Notifications
+      updateNotifications(dt);
+      updateDataPackets(dt);
+
+      // Player trail
+      if (player.moving) {
+        playerTrail.push({ x: player.x, y: player.y, alpha: 0.4, life: 0.8 });
+        if (playerTrail.length > 20) playerTrail.shift();
+      }
+      for (var ti = playerTrail.length - 1; ti >= 0; ti--) {
+        playerTrail[ti].life -= dt;
+        playerTrail[ti].alpha = Math.max(0, playerTrail[ti].life / 0.8) * 0.4;
+        if (playerTrail[ti].life <= 0) playerTrail.splice(ti, 1);
+      }
     }
 
     // ═══════════════════════════════════════════
@@ -2832,22 +3475,38 @@
       // Walls
       renderWalls(ctx);
 
+      // Data packets along connection lines
+      renderDataPackets(ctx);
+
       // Particles (behind stations)
       renderParticles(ctx);
 
       // Stations
       renderStations(ctx);
 
+      // Player trail
+      for (var ti = 0; ti < playerTrail.length; ti++) {
+        var t = playerTrail[ti];
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,212,255,' + t.alpha + ')';
+        ctx.fill();
+      }
+
       // Player (with interpolation)
       var px = player.prevX + (player.x - player.prevX) * alpha;
       var py = player.prevY + (player.y - player.prevY) * alpha;
       renderPlayer(ctx, px, py);
+
+      // Floating event notifications (world-space)
+      renderNotifications(ctx);
 
       ctx.restore();
 
       // HUD + Minimap (screen-space)
       updateHUD();
       renderMinimap();
+      renderActivityFeed();
     }
 
     // ═══════════════════════════════════════════
@@ -2918,6 +3577,12 @@
         openSpawnModal();
       }
 
+      // Number key shortcuts: 1-7 open station overlays
+      var stationKeys = { '1': 'sessions', '2': 'cron', '3': 'gateway', '4': 'agents', '5': 'logs', '6': 'skills', '7': 'comms' };
+      if (stationKeys[key] && !activeOverlay && !document.getElementById('chatPanel').classList.contains('active')) {
+        openOverlay(stationKeys[key]);
+      }
+
       // Prevent arrow key scrolling
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].indexOf(key) !== -1) {
         e.preventDefault();
@@ -2930,6 +3595,67 @@
 
     window.addEventListener('blur', function() {
       keysDown = {};
+    });
+
+    // ═══════════════════════════════════════════
+    // MOUSE INTERACTION (click + hover)
+    // ═══════════════════════════════════════════
+    function getStationAtScreen(sx, sy) {
+      var wx = sx + camera.x;
+      var wy = sy + camera.y;
+      for (var i = 0; i < stations.length; i++) {
+        var s = stations[i];
+        if (wx >= s.x && wx <= s.x + s.w && wy >= s.y && wy <= s.y + s.h) {
+          return s;
+        }
+      }
+      return null;
+    }
+
+    canvas.addEventListener('click', function(e) {
+      if (activeOverlay) return;
+      var rect = canvas.getBoundingClientRect();
+      var hit = getStationAtScreen(e.clientX - rect.left, e.clientY - rect.top);
+      if (hit) {
+        openOverlay(hit.id);
+      }
+    });
+
+    var hoveredStation = null;
+    canvas.addEventListener('mousemove', function(e) {
+      var rect = canvas.getBoundingClientRect();
+      var hit = getStationAtScreen(e.clientX - rect.left, e.clientY - rect.top);
+      var tooltip = document.getElementById('stationTooltip');
+      if (hit) {
+        canvas.style.cursor = 'pointer';
+        hoveredStation = hit;
+        // Position and populate tooltip
+        var stats = getStationQuickStats(hit);
+        var nameEl = document.getElementById('tooltipName');
+        clearChildren(nameEl);
+        var dot = document.createElement('span');
+        dot.className = 'status-dot';
+        dot.style.width = '6px';
+        dot.style.height = '6px';
+        dot.style.borderRadius = '50%';
+        dot.style.display = 'inline-block';
+        dot.style.background = hit.getStatusColor();
+        nameEl.appendChild(dot);
+        nameEl.appendChild(document.createTextNode(' ' + hit.emoji + ' ' + hit.label));
+        document.getElementById('tooltipStats').textContent = stats || hit.getSubInfo();
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top = (e.clientY + 14) + 'px';
+        tooltip.classList.add('visible');
+      } else {
+        canvas.style.cursor = 'default';
+        hoveredStation = null;
+        tooltip.classList.remove('visible');
+      }
+    });
+
+    canvas.addEventListener('mouseleave', function() {
+      document.getElementById('stationTooltip').classList.remove('visible');
+      hoveredStation = null;
     });
 
     // ═══════════════════════════════════════════
@@ -2946,7 +3672,20 @@
     // Fetch initial data
     refreshAll();
 
-    // Data refresh interval (15s)
+    // Data refresh interval (15s) + overlay auto-refresh
+    function refreshActiveOverlay() {
+      if (!activeOverlay) return;
+      switch (activeOverlay) {
+        case 'sessions': renderSessionsGrid(); break;
+        case 'cron': renderCronGrid(); break;
+        case 'gateway': renderGatewayInfo(); renderHealthBanner(); break;
+        case 'comms': renderChannels(); break;
+        case 'agents': renderAgentsGrid(); break;
+        case 'skills': renderSkillsGrid(); break;
+        case 'logs': renderLogs(); break;
+      }
+    }
+
     var dataIntervalId = setInterval(function() {
       if (document.hidden) return;
       fetchStatus();
@@ -2954,10 +3693,44 @@
       if (Date.now() - lastCronRefreshAt > 60000) {
         fetchCron();
       }
+      refreshActiveOverlay();
     }, 15000);
 
     // Refresh counter tick (1s)
-    var tickIntervalId = setInterval(updateRefreshBar, 1000);
+    function updateCronCountdown() {
+      var el = document.getElementById('cronCountdown');
+      if (!el) return;
+      if (!cronData || !cronData.jobs || !cronData.jobs.length) {
+        el.textContent = '';
+        return;
+      }
+      var nextJob = null;
+      var nextMs = Infinity;
+      cronData.jobs.forEach(function(j) {
+        if (j.enabled && j.state && j.state.nextRunAtMs) {
+          var diff = j.state.nextRunAtMs - Date.now();
+          if (diff > 0 && diff < nextMs) {
+            nextMs = diff;
+            nextJob = j;
+          }
+        }
+      });
+      if (!nextJob) {
+        el.textContent = '';
+        return;
+      }
+      var mins = Math.floor(nextMs / 60000);
+      var timeStr;
+      if (mins < 1) timeStr = '<1m';
+      else if (mins < 60) timeStr = mins + 'm';
+      else timeStr = Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+      el.textContent = '\u23F0 Next: ' + nextJob.name + ' in ' + timeStr;
+    }
+
+    var tickIntervalId = setInterval(function() {
+      updateRefreshBar();
+      updateCronCountdown();
+    }, 1000);
 
     // Clean up on unload
     window.addEventListener('beforeunload', function() {
