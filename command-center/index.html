@@ -3576,7 +3576,7 @@
       try {
         // Prefix message with NPC role context so the agent responds in character
         var contextMsg = '[Speaking to ' + npcName + ' (' + npc.role + ')] ' + msg;
-        var body = { message: contextMsg };
+        var body = { message: contextMsg, agentId: 'main' };
         if (sessionId) body.sessionId = sessionId;
 
         var data = await api('/api/agent/message', {
