@@ -989,19 +989,39 @@
       left: 50%;
       transform: translateX(-50%);
       display: none;
-      align-items: center;
-      gap: 10px;
+      flex-direction: column;
+      gap: 0;
       z-index: 200;
-      background: rgba(12,12,20,0.9);
+      background: rgba(12,12,20,0.92);
       backdrop-filter: blur(8px);
       border-radius: 14px;
-      padding: 8px 12px;
+      padding: 0;
       border: 1.5px solid rgba(255,255,255,0.12);
-      width: 480px;
+      width: 520px;
       max-width: 90vw;
     }
 
     .npc-chat-bar.active { display: flex; }
+
+    .npc-chat-bar .npc-response {
+      display: none;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: #d0d0d0;
+      max-height: 160px;
+      overflow-y: auto;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .npc-chat-bar .npc-response.has-text { display: block; }
+
+    .npc-chat-bar .npc-input-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+    }
 
     .npc-chat-bar .npc-chat-label {
       font-size: 0.75rem;
@@ -1240,10 +1260,13 @@
   </div>
 
   <div class="npc-chat-bar" id="npcChatBar">
-    <span class="npc-chat-label" id="npcChatLabel">JARVIS:</span>
-    <input type="text" id="npcChatInput" placeholder="Say something...">
-    <button class="npc-send-btn" id="npcSendBtn">Send</button>
-    <button class="npc-expand-btn" id="npcExpandBtn" title="Expand to panel">&#x2197;</button>
+    <div class="npc-response" id="npcResponse"></div>
+    <div class="npc-input-row">
+      <span class="npc-chat-label" id="npcChatLabel">JARVIS:</span>
+      <input type="text" id="npcChatInput" placeholder="Say something...">
+      <button class="npc-send-btn" id="npcSendBtn">Send</button>
+      <button class="npc-expand-btn" id="npcExpandBtn" title="Expand to panel">&#x2197;</button>
+    </div>
   </div>
 
   <div class="activity-feed" id="activityFeed"></div>
@@ -3537,9 +3560,12 @@
       var bar = document.getElementById('npcChatBar');
       var label = document.getElementById('npcChatLabel');
       var input = document.getElementById('npcChatInput');
+      var resp = document.getElementById('npcResponse');
       label.textContent = npc.emoji + ' ' + npc.name + ':';
       label.style.color = npc.color;
       bar.style.borderColor = npc.color + '40';
+      resp.textContent = '';
+      resp.classList.remove('has-text');
       bar.classList.add('active');
       input.value = '';
       input.focus();
@@ -3548,6 +3574,12 @@
     function closeNPCChat() {
       activeNPCChat = null;
       document.getElementById('npcChatBar').classList.remove('active');
+    }
+
+    function showNPCResponse(name, text) {
+      var resp = document.getElementById('npcResponse');
+      resp.textContent = name + ': ' + text;
+      resp.classList.add('has-text');
     }
 
     async function sendNPCMessage() {
@@ -3587,6 +3619,7 @@
 
         var responseText = extractAgentResponse(data);
         addSpeechBubble(npcId, responseText, responseText.length > 100 ? 12 : 8);
+        showNPCResponse(npcName, responseText);
 
         // Add to activity feed
         activityFeed.unshift({ msg: npcName + ': replied', color: npc.color, ts: Date.now() });
@@ -3598,6 +3631,7 @@
         }
       } catch (e) {
         addSpeechBubble(npcId, 'Error: ' + e.message, 5);
+        showNPCResponse(npcName, 'Error: ' + e.message);
       }
 
       sendBtn.disabled = false;
