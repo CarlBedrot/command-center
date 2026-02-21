@@ -2266,6 +2266,12 @@
 
     function extractAgentResponse(data) {
       if (typeof data === 'string') return data;
+      if (data.payloads && Array.isArray(data.payloads)) {
+        return data.payloads
+          .map(function(p) { return p.text; })
+          .filter(function(t) { return t; })
+          .join('\n');
+      }
       if (data.raw) return data.raw;
       if (data.response) return data.response;
       if (data.text) return data.text;
